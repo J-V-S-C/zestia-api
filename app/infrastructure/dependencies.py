@@ -4,9 +4,10 @@ from typing import Annotated
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.application.auth import AuthenticationService
 from app.application.entities import Account
 from app.application.errors import Unauthenticated
+from app.application.services.auth import AuthenticationService
+from app.application.services.foods import FoodService
 from app.application.services.organizations import OrganizationService
 from app.infrastructure.repository import SqlAlchemyRepository
 
@@ -45,5 +46,10 @@ def get_auth(request: Request, repository: RepositoryDependency) -> Authenticati
     return AuthenticationService(repository, request.app.state.hasher)
 
 
+def get_foods(repository: RepositoryDependency) -> FoodService:
+    return FoodService(repository, repository)
+
+
 OrganizationsDependency = Annotated[OrganizationService, Depends(get_organizations)]
 AuthenticationDependency = Annotated[AuthenticationService, Depends(get_auth)]
+FoodsDependency = Annotated[FoodService, Depends(get_foods)]
