@@ -52,6 +52,27 @@ def main() -> int:
         run("git", "diff", "--check")
         run("git", "diff", "--cached", "--check")
         run(sys.executable, "-m", "pip", "check")
+        with tempfile.TemporaryDirectory(prefix="zestia-audit-") as directory:
+            # Build an exact snapshot including transitive dependencies. Editable application
+            # code has no package advisory entry and is checked by lint and tests instead.
+            snapshot = Path(directory) / "requirements.txt"
+            snapshot.write_text(
+                subprocess.check_output(
+                    [sys.executable, "-m", "pip", "list", "--format=freeze", "--exclude-editable"],
+                    cwd=ROOT,
+                    text=True,
+                )
+            )
+            run(
+                sys.executable,
+                "-m",
+                "pip_audit",
+                "--strict",
+                "--no-deps",
+                "--disable-pip",
+                "-r",
+                str(snapshot),
+            )
         run(sys.executable, "-m", "pre_commit", "validate-config")
         run(sys.executable, "-m", "ruff", "check", "app", "tests", "migrations", "scripts")
         run(
