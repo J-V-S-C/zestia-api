@@ -1,3 +1,5 @@
+from datetime import date
+from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -18,6 +20,18 @@ class OrganizationInput(Schema):
 
 class OrganizationResponse(OrganizationInput):
     id: UUID
+
+
+class FoodInput(Schema):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
+    category: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+    quantity_kg: Decimal = Field(gt=0, max_digits=12, decimal_places=3)
+    expiration_date: date
+
+
+class FoodResponse(FoodInput):
+    id: UUID
+    donor_organization_id: UUID
 
 
 class RegistrationInput(Schema):

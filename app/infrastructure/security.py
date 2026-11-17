@@ -24,6 +24,8 @@ class TokenService:
     def __init__(self, settings: Settings) -> None:
         self.secret = settings.jwt_secret.get_secret_value()
         self.minutes = settings.access_token_minutes
+        self.issuer = settings.jwt_issuer
+        self.audience = settings.jwt_audience
 
     def issue(self, account_id: UUID) -> str:
         now = datetime.now(UTC)
@@ -32,8 +34,8 @@ class TokenService:
                 "sub": str(account_id),
                 "iat": now,
                 "exp": now + timedelta(minutes=self.minutes),
-                "iss": "realimenta",
-                "aud": "realimenta-api",
+                "iss": self.issuer,
+                "aud": self.audience,
             },
             self.secret,
             algorithm="HS256",
@@ -45,8 +47,8 @@ class TokenService:
                 token,
                 self.secret,
                 algorithms=["HS256"],
-                issuer="realimenta",
-                audience="realimenta-api",
+                issuer=self.issuer,
+                audience=self.audience,
                 options={"require": ["sub", "iat", "exp", "iss", "aud"]},
             )
             return UUID(claims["sub"])

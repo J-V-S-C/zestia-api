@@ -1,75 +1,90 @@
-# ReAlimenta backend — Epic 1
+# Zestia backend
 
-Organization CRUD with FastAPI, PostgreSQL 17 and SQLAlchemy 2.0. Requirements: [E01 / RF-01 / RN-01–02](../backlog.md). SUPERMARKET, NGO and COMMUNITY_KITCHEN classify institutions; they are not permission roles.
+FastAPI + PostgreSQL 17. Organization and food CRUD are implemented; frontend, request workflows and metrics remain pending. [Requirements](../backlog.md) · [Architecture](../arch.md) · [Validation](../validation.md).
 
-## Run locally
+## One-time setup
 
 From `backend/`, with Python 3.12+ and Docker Compose:
 
-```bash
+```sh
 python -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pip install --no-deps -e .
+.venv/bin/python -m pre_commit install
+```
+
+Copy [.env.example](.env.example) to `.env` if it does not exist. Fill in every setting, using separate generated database and JWT secrets. Keep `.env` private. When reusing an existing database, preserve its credentials and Compose project name.
+
+Initialize the database once:
+
+```sh
+docker compose up -d --wait
+.venv/bin/python -m alembic upgrade head
+```
+
+Create the disposable test database once, and set TEST_DATABASE_URL in `.env` to its connection URL:
+
+```sh
+docker compose exec -T postgres sh -c 'createdb -U "$POSTGRES_USER" "${POSTGRES_DB}_test"'
+```
+
+## Daily startup
+
+Activate the environment in each new terminal:
+
+```bash
 source .venv/bin/activate
-python -m pip install -r requirements-dev.txt
 ```
 
-Copy `.env.example` to `.env` if missing. Set JWT_SECRET to a generated secret of at least 32 characters: `python -c 'import secrets; print(secrets.token_urlsafe(48))'`. The example placeholder is rejected; this workspace already has an ignored secret configured.
+For fish, use `source .venv/bin/activate.fish` instead. Then start the app:
 
-```bash
-docker compose -p realimenta up -d --wait
-alembic upgrade head
-uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8001
+```sh
+docker compose up -d --wait
+python -m uvicorn app.main:create_app --factory --reload --port 8001
 ```
 
-An existing PostgreSQL container was reused with new databases `realimenta_e01` and `realimenta_e01_test`; earlier prototype data was preserved. When reusing a volume, create the database named in DATABASE_URL if it does not exist. Existing volume credentials remain unchanged. Do not bind two containers to the same port.
+If PostgreSQL is already running, only the last command is needed. Open [Swagger](http://localhost:8001/docs) to explore the endpoints and request schemas. Health checks: `/health/live` and `/health/ready`.
 
-[Swagger](http://localhost:8001/docs) provides request schemas; `/openapi.json` is the executable contract. Health checks: `/health/live` and `/health/ready`. Startup never creates tables.
+## After pulling changes
 
-## API
+If dependencies changed, rerun the two pip installation commands from setup. If new migrations were added, run:
 
-Paths use `/api/v1`:
-
-| Method | Path | Behavior |
-|---|---|---|
-| POST | `/auth/register` | Account with email and 12–128 character password; 201. |
-| POST | `/auth/login` | JSON email/password → access_token, token_type, expires_in. |
-| GET | `/auth/me` | Current account; never password hashes. |
-| POST | `/organizations` | Create own organization; 201 and Location header. |
-| GET | `/organizations` | List all; offset=0, limit=50 (max 100). |
-| GET | `/organizations/{organization_id}` | Read one. |
-| PUT | `/organizations/{organization_id}` | Owner replaces name/type/location. |
-| DELETE | `/organizations/{organization_id}` | Owner deletes an unused organization; 204. |
-
-Organization endpoints require `Authorization: Bearer <access_token>`. Each account owns at most one organization. Authenticated users browse all organizations; only owners modify/delete. Deleting an organization preserves its account, which may create a replacement.
-
-```json
-{"name":"Fictional Kitchen","type":"COMMUNITY_KITCHEN","location":"Porto Alegre"}
+```sh
+python -m alembic upgrade head
 ```
 
-Name/location are trimmed, required and limited to 160/240 characters. Client-supplied ownership fields are rejected. SQL pagination is ordered by name/id. Argon2 protects passwords; JWTs expire after 60 minutes by default.
+Alembic updates the database schema while preserving existing data. It is needed for schema changes, rather than each startup.
 
-Errors: `{"error":{"code":"...","message":"..."}}`. HTTP 401 authentication, 403 ownership, 404 missing resource, 409 conflict, 422 validation, 503 database unavailable. Validation errors omit submitted input values.
+## Verification
 
-RN-02 translates PostgreSQL foreign-key deletion restrictions into 409. E02/E03 must reference organizations with ON DELETE RESTRICT. Their tables are not implemented here; integration tests use a real referencing record to verify the restriction.
+With the environment activated and PostgreSQL running:
 
-## Configuration and verification
-
-`.env`: DATABASE_URL (postgresql+psycopg), JWT_SECRET (random, ≥32 characters), ACCESS_TOKEN_MINUTES (60), CORS_ORIGINS (JSON list; default localhost:3000). POSTGRES_USER/PASSWORD/DB initialize Compose; they must agree with DATABASE_URL. Keep `.env` out of Git.
-
-```bash
-python -m pytest tests/unit -v
-ruff check app tests migrations
-ruff format --check app tests migrations
+```sh
+python scripts/verify.py
 ```
 
-Create a separate test database once, then run:
+This runs lint, formatting, dependency compatibility and known-vulnerability checks, all PostgreSQL tests with coverage, and migration checks. TEST_DATABASE_URL must point to a disposable database ending in `_test`: verification clears its data and tests migration downgrade/upgrade. Missing databases, skipped tests and failed checks fail the gate.
 
-```bash
-docker compose -p realimenta exec -T postgres createdb -U realimenta realimenta_e01_test
-TEST_DATABASE_URL=postgresql+psycopg://realimenta:realimenta@localhost:5432/realimenta_e01_test python -m pytest --cov=app --cov-branch --cov-report=term-missing -q
+The vulnerability check uses [pip-audit](https://github.com/pypa/pip-audit) on an exact snapshot of installed packages, including runtime, development and transitive dependencies. Only editable project code is excluded from the package audit. Known vulnerabilities and audit errors fail verification; no findings are ignored or automatically fixed. Internet access to the advisory service is required. This scans dependency advisories; application security rules are covered separately by tests.
+
+The installed [pre-commit hook](.pre-commit-config.yaml) runs the same script before each commit. Install it once per clone and keep `.venv` available. [GitHub Actions](.github/workflows/verify.yml) runs it on pushes and pull requests with isolated PostgreSQL fixtures and Python 3.12/3.14. GitHub execution begins after the workflow is committed and pushed.
+
+For a quick unit-only run:
+
+```sh
+python -m pytest tests/unit -q
 ```
 
-Tests migrate and clear that database. Without the shell variable, integration tests skip. Coverage includes types, invalid inputs, persisted CRUD, ownership, missing resources, concurrent creation, dependency-protected deletion, passwords and invalid tokens.
+## API notes
 
-For schema changes, generate/review an Alembic revision, then run `alembic upgrade head` and `alembic check`. Layers: [arch.md](../arch.md). Frontend, E02–E04, account recovery/verification and token refresh/revocation remain pending.
+All application paths start with `/api/v1`. Register/login under `/auth`; passwords must contain 8–128 characters. Use the returned bearer token for `/organizations` and `/foods`. Both resources support create, list, detail, update and delete. Swagger contains the complete contract.
 
-Service unit tests live in `tests/unit` and mock only external ports. HTTP integration/E2E tests live in `tests/integration`: TestClient drives the real ASGI app, real hashing/JWT, migrations and PostgreSQL (no service/repository substitutes). They exercise the API end to end in process, rather than through a deployed server. Run `pytest -m e2e` with TEST_DATABASE_URL to select them. Coverage is collected across both suites; unit-only runs do not measure HTTP/persistence coverage.
+- Each active account owns at most one active organization. All organization types can donate; owners alone can modify their records.
+- Food lists accept `donor_organization_id`, `offset` and `limit` filters.
+- Food quantities use Decimal kg with gram precision. Creation/editing accept expiration dates from today onward in America/Sao_Paulo.
+- `DELETE /auth/me` closes the authenticated account and archives its unused organization atomically. Closed accounts cannot log in or use existing tokens; their email stays reserved. Closure returns 409 while the organization has food or requests.
+- Organization deletion sets `deleted_at`, hides it from normal reads, and permits a replacement organization. Account/organization rows are retained; there is no automatic purge or restore endpoint.
+- Approved quantities limit reductions; any associated request blocks food deletion. Referenced organizations cannot be deleted.
+- Errors use `{"error":{"code":"...","message":"..."}}`, with HTTP 401/403/404/409/422/503 as appropriate.
+
+Request records currently support food integrity checks; request creation, approval/rejection and history endpoints remain E03. Detailed rules belong in the [backlog](../backlog.md).

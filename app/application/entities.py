@@ -1,4 +1,6 @@
 from dataclasses import dataclass, field
+from datetime import date, datetime
+from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID
 
@@ -36,3 +38,31 @@ class Account:
     id: UUID
     email: str
     password_hash: str = field(repr=False)
+    deleted_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class Food:
+    id: UUID
+    donor_organization_id: UUID
+    name: str
+    category: str
+    quantity_kg: Decimal
+    expiration_date: date
+
+    def __post_init__(self) -> None:
+        for name, maximum in (("name", 160), ("category", 80)):
+            value = getattr(self, name).strip()
+            if not value or len(value) > maximum:
+                raise InvalidInput("invalid_food", f"{name} must contain 1–{maximum} characters.")
+            object.__setattr__(self, name, value)
+        if (
+            not self.quantity_kg.is_finite()
+            or not Decimal("0") < self.quantity_kg <= Decimal("999999999.999")
+            or self.quantity_kg != self.quantity_kg.quantize(Decimal("0.001"))
+        ):
+            raise InvalidInput(
+                "invalid_food_quantity",
+                "Quantity must be positive, at most 999999999.999 kg, with up to 3 decimal places.",
+            )
+        object.__setattr__(self, "quantity_kg", self.quantity_kg.quantize(Decimal("0.001")))

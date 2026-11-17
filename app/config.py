@@ -6,10 +6,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=Path(__file__).parents[1] / ".env", extra="ignore")
-    database_url: str = "postgresql+psycopg://realimenta:realimenta@localhost:5432/realimenta_e01"
+    database_url: str
     jwt_secret: SecretStr
-    access_token_minutes: int = Field(default=60, ge=1, le=1440)
-    cors_origins: list[str] = ["http://localhost:3000"]
+    jwt_issuer: str = Field(min_length=1)
+    jwt_audience: str = Field(min_length=1)
+    access_token_minutes: int = Field(ge=1, le=1440)
+    cors_origins: list[str]
 
     @field_validator("jwt_secret")
     @classmethod

@@ -33,7 +33,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         yield
         engine.dispose()
 
-    app = FastAPI(title="ReAlimenta API", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Zestia API", version="0.1.0", lifespan=lifespan)
     app.state.engine = engine
     app.state.settings = settings
     app.state.sessions = sessionmaker(engine, expire_on_commit=False)
@@ -72,7 +72,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         constraint = getattr(getattr(error.orig, "diag", None), "constraint_name", None)
         if constraint == "accounts_email_key":
             return error_response("email_registered", "Email is already registered.", 409)
-        if constraint == "organizations_owner_account_id_key":
+        if constraint == "organizations_active_owner_key":
             return error_response(
                 "organization_exists", "An account can own only one organization.", 409
             )

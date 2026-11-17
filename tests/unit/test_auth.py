@@ -3,10 +3,10 @@ from uuid import uuid4
 
 import pytest
 
-from app.application.auth import AuthenticationService
 from app.application.entities import Account
 from app.application.errors import BusinessError, InvalidInput, Unauthenticated
 from app.application.interfaces import AccountRepository, PasswordHasher
+from app.application.services.auth import AuthenticationService
 
 
 @pytest.fixture
@@ -18,7 +18,7 @@ def auth():
     return AuthenticationService(repository, hasher), repository, hasher
 
 
-@pytest.mark.parametrize("length", [12, 128])
+@pytest.mark.parametrize("length", [8, 128])
 def test_registration_normalizes_email_and_persists_only_hash(auth, length):
     service, repository, hasher = auth
     password = "x" * length
@@ -30,7 +30,7 @@ def test_registration_normalizes_email_and_persists_only_hash(auth, length):
     assert password not in repr(account)
 
 
-@pytest.mark.parametrize("length", [0, 11, 129])
+@pytest.mark.parametrize("length", [0, 7, 129])
 def test_invalid_password_does_not_write_or_hash(auth, length):
     service, repository, hasher = auth
     with pytest.raises(InvalidInput) as error:
