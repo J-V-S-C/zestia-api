@@ -1,4 +1,18 @@
-"""Run the same checks before commits and in CI, using only a dedicated test database."""
+"""Checks run before commits and in CI:
+
+- Git whitespace errors and installed dependency compatibility.
+- Known dependency vulnerabilities (pip-audit).
+- Pre-commit configuration, Ruff lint and formatting.
+- Database migrations and agreement between schema and models.
+- All unit/integration tests, with coverage; skipped tests fail the gate.
+- Full migration downgrade and upgrade on the disposable test database.
+
+TEST_DATABASE_URL must point to a separate database ending in _test. Tests clear
+its records and migration checks drop/rebuild its tables. The name check helps
+prevent accidentally running these destructive checks against application data;
+it does not provide backups or secure the database. The application can use
+Supabase independently, configured through DATABASE_URL.
+"""
 
 import argparse
 import os

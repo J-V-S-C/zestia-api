@@ -164,6 +164,7 @@ def test_invalid_tokens(client: TestClient, kind: str) -> None:
     secret = "a-test-secret-at-least-32-characters-long"
     claims = {
         "sub": str(uuid4()),
+        "jti": str(uuid4()),
         "iat": datetime.now(UTC),
         "exp": datetime.now(UTC) + timedelta(minutes=5),
         "iss": client.app.state.settings.jwt_issuer,

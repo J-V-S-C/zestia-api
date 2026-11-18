@@ -30,7 +30,7 @@ def get_account(
     if credentials is None:
         raise Unauthenticated("missing_token", "A bearer token is required.")
     account = repository.get_account(request.app.state.tokens.subject(credentials.credentials))
-    if account is None:
+    if account is None or not repository.session_is_active(account.id, credentials.credentials):
         raise Unauthenticated("invalid_token", "Account no longer exists.")
     return account
 

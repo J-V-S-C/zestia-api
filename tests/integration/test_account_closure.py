@@ -18,6 +18,14 @@ def org(client, headers):
         json={"name": "Archive fixture", "type": "NGO", "location": "Centro"},
     )
     assert response.status_code == 201
+    # Verified donor fixture; review permissions and transitions have dedicated API tests.
+    from sqlalchemy import text
+
+    with client.app.state.engine.begin() as connection:
+        connection.execute(
+            text("UPDATE organizations SET verification_status = 'VERIFIED' WHERE id = :id"),
+            {"id": response.json()["id"]},
+        )
     return response.headers["Location"]
 
 

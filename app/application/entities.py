@@ -7,6 +7,18 @@ from uuid import UUID
 from app.application.errors import InvalidInput
 
 
+class AccountRole(StrEnum):
+    USER = "USER"
+    ADMIN = "ADMIN"
+
+
+class VerificationStatus(StrEnum):
+    PENDING = "PENDING"
+    VERIFIED = "VERIFIED"
+    REJECTED = "REJECTED"
+    SUSPENDED = "SUSPENDED"
+
+
 class OrganizationType(StrEnum):
     SUPERMARKET = "SUPERMARKET"
     NGO = "NGO"
@@ -20,6 +32,8 @@ class Organization:
     name: str
     type: OrganizationType
     location: str
+    deleted_at: datetime | None = None
+    verification_status: VerificationStatus = VerificationStatus.PENDING
 
     def __post_init__(self) -> None:
         for name, maximum in (("name", 160), ("location", 240)):
@@ -39,6 +53,7 @@ class Account:
     email: str
     password_hash: str = field(repr=False)
     deleted_at: datetime | None = None
+    role: AccountRole = AccountRole.USER
 
 
 @dataclass(frozen=True)
