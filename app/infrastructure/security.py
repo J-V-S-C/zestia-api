@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import jwt
 from pwdlib import PasswordHash
@@ -32,6 +32,7 @@ class TokenService:
         return jwt.encode(
             {
                 "sub": str(account_id),
+                "jti": str(uuid4()),
                 "iat": now,
                 "exp": now + timedelta(minutes=self.minutes),
                 "iss": self.issuer,
@@ -49,7 +50,7 @@ class TokenService:
                 algorithms=["HS256"],
                 issuer=self.issuer,
                 audience=self.audience,
-                options={"require": ["sub", "iat", "exp", "iss", "aud"]},
+                options={"require": ["sub", "iat", "exp", "iss", "aud", "jti"]},
             )
             return UUID(claims["sub"])
         except (jwt.InvalidTokenError, TypeError, ValueError) as error:

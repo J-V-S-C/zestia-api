@@ -4,7 +4,7 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
-from app.application.entities import Food
+from app.application.entities import Food, VerificationStatus
 from app.application.errors import BusinessError, Forbidden, InvalidInput
 from app.application.interfaces import FoodRepository, OrganizationRepository
 
@@ -26,6 +26,10 @@ class FoodService:
         if organization is None:
             raise Forbidden(
                 "organization_required", "Register an organization before donating food."
+            )
+        if organization.verification_status != VerificationStatus.VERIFIED:
+            raise Forbidden(
+                "organization_unverified", "Organization must be verified before publishing food."
             )
         food = Food(uuid4(), organization.id, name, category, quantity_kg, expiration_date)
         self._require_unexpired(food)
@@ -50,7 +54,7 @@ class FoodService:
         expiration_date: date,
     ) -> Food:
         food = self.repository.get_food(food_id, lock=True)
-        self._require_owner(account_id, food)
+        self._require_owner(account_id, food, require_verified=True)
         updated = replace(
             food,
             name=name,
@@ -72,11 +76,17 @@ class FoodService:
         self._require_owner(account_id, food)
         self.repository.delete_food(food)
 
-    def _require_owner(self, account_id: UUID, food: Food) -> None:
+    def _require_owner(
+        self, account_id: UUID, food: Food, *, require_verified: bool = False
+    ) -> None:
         organization = self.organizations.get_organization(food.donor_organization_id)
         if account_id != organization.owner_account_id:
             raise Forbidden(
                 "not_owner", "Only the donor organization owner can change or delete food."
+            )
+        if require_verified and organization.verification_status != VerificationStatus.VERIFIED:
+            raise Forbidden(
+                "organization_unverified", "Organization must be verified before editing food."
             )
 
     @staticmethod

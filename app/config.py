@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import EmailStr, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,4 +28,24 @@ class Settings(BaseSettings):
     def validate_driver(cls, value: str) -> str:
         if not value.startswith("postgresql+psycopg://"):
             raise ValueError("Use a postgresql+psycopg database URL.")
+        return value
+
+
+class RecoverySettings(BaseSettings):
+    model_config = Settings.model_config
+    recovery_token_minutes: int = Field(ge=1, le=60)
+    recovery_window_seconds: int = Field(ge=1)
+    recovery_max_attempts: int = Field(ge=1)
+
+
+class AdminBootstrapSettings(BaseSettings):
+    model_config = Settings.model_config
+    admin_email: EmailStr
+    admin_password: SecretStr = Field(min_length=8, max_length=128)
+
+    @field_validator("admin_password")
+    @classmethod
+    def reject_placeholder(cls, value: SecretStr) -> SecretStr:
+        if value.get_secret_value().startswith("replace-"):
+            raise ValueError("Configure a unique admin password in the private environment.")
         return value

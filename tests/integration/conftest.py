@@ -33,7 +33,13 @@ def postgres() -> Iterator[Engine]:
 def database(postgres: Engine) -> Iterator[Engine]:
     def clear() -> None:
         with postgres.begin() as connection:
-            connection.execute(text("TRUNCATE food_requests, foods, organizations, accounts"))
+            connection.execute(
+                text(
+                    "TRUNCATE recovery_rate_limits, lifecycle_events, account_recovery, "
+                    "auth_sessions, "
+                    "food_requests, foods, organizations, accounts"
+                )
+            )
 
     clear()
     yield postgres

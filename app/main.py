@@ -9,7 +9,9 @@ from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.orm import sessionmaker
 
 from app.application.errors import BusinessError, Forbidden, InvalidInput, NotFound, Unauthenticated
+from app.application.services.recovery import RecoveryDelivery
 from app.config import Settings
+from app.infrastructure.lifecycle_routes import router as lifecycle_router
 from app.infrastructure.routes import router
 from app.infrastructure.security import Argon2PasswordHasher, TokenService
 
@@ -22,7 +24,9 @@ def error_response(code: str, message: str, status: int) -> JSONResponse:
     )
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, recovery_delivery: RecoveryDelivery | None = None
+) -> FastAPI:
     settings = settings or Settings()
     engine = create_engine(
         settings.database_url, pool_pre_ping=True, connect_args={"connect_timeout": 5}
@@ -34,6 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         engine.dispose()
 
     app = FastAPI(title="Zestia API", version="0.1.0", lifespan=lifespan)
+    app.state.recovery_delivery = recovery_delivery
     app.state.engine = engine
     app.state.settings = settings
     app.state.sessions = sessionmaker(engine, expire_on_commit=False)
@@ -96,4 +101,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"status": "ready"}
 
     app.include_router(router)
+    app.include_router(lifecycle_router)
     return app

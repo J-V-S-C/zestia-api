@@ -1,13 +1,18 @@
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Query, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi.security import HTTPAuthorizationCredentials
 
+from app.application.errors import Unauthenticated
 from app.infrastructure.dependencies import (
     AccountDependency,
     AuthenticationDependency,
     FoodsDependency,
     OrganizationsDependency,
+    RepositoryDependency,
+    bearer,
 )
 from app.infrastructure.schemas import (
     AccountResponse,
@@ -32,13 +37,34 @@ def register(payload: RegistrationInput, service: AuthenticationDependency) -> A
 
 @router.post("/auth/login", response_model=TokenResponse, tags=["auth"])
 def login(
-    payload: LoginInput, service: AuthenticationDependency, request: Request
+    payload: LoginInput,
+    service: AuthenticationDependency,
+    request: Request,
+    repository: RepositoryDependency,
 ) -> TokenResponse:
     account = service.login(str(payload.email), payload.password.get_secret_value())
+    if repository.get_account(account.id) is None:
+        raise Unauthenticated("invalid_credentials", "Email or password is incorrect.")
+    token = request.app.state.tokens.issue(account.id)
+    repository.save_session(
+        account.id,
+        token,
+        datetime.now(UTC) + timedelta(minutes=request.app.state.settings.access_token_minutes),
+    )
     return TokenResponse(
-        access_token=request.app.state.tokens.issue(account.id),
+        access_token=token,
         expires_in=request.app.state.settings.access_token_minutes * 60,
     )
+
+
+@router.post("/auth/logout", status_code=204, tags=["auth"])
+def logout(
+    account: AccountDependency,
+    repository: RepositoryDependency,
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
+) -> Response:
+    repository.revoke_session(credentials.credentials)
+    return Response(status_code=204)
 
 
 @router.get("/auth/me", response_model=AccountResponse, tags=["auth"])
@@ -105,6 +131,17 @@ def delete_organization(
 ) -> Response:
     service.delete(account.id, organization_id)
     return Response(status_code=204)
+
+
+@router.post(
+    "/organizations/{organization_id}/restore",
+    response_model=OrganizationResponse,
+    tags=["organizations"],
+)
+def restore_organization(
+    organization_id: UUID, account: AccountDependency, service: OrganizationsDependency
+) -> OrganizationResponse:
+    return OrganizationResponse.model_validate(service.restore(account.id, organization_id))
 
 
 @router.post("/foods", response_model=FoodResponse, status_code=201, tags=["foods"])

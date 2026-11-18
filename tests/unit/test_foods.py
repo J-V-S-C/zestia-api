@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from app.application.entities import Food, Organization, OrganizationType
+from app.application.entities import Food, Organization, OrganizationType, VerificationStatus
 from app.application.errors import BusinessError, Forbidden, InvalidInput, NotFound
 from app.application.interfaces import FoodRepository, OrganizationRepository
 from app.application.services.foods import FoodService
@@ -23,7 +23,14 @@ def foods():
 @pytest.mark.parametrize("type", list(OrganizationType))
 def test_any_organization_type_can_register_food(foods, type):
     service, repository, organizations = foods
-    organization = Organization(uuid4(), uuid4(), "Kitchen", type, "Porto Alegre")
+    organization = Organization(
+        uuid4(),
+        uuid4(),
+        "Kitchen",
+        type,
+        "Porto Alegre",
+        verification_status=VerificationStatus.VERIFIED,
+    )
     organizations.find_owned_organization.return_value = organization
     food = service.create(
         organization.owner_account_id, " Rice ", " Grains ", Decimal("1.125"), date.max
@@ -62,7 +69,12 @@ def test_account_without_organization_cannot_donate(foods):
 def test_invalid_food_is_rejected_before_save(foods, field, value):
     service, repository, organizations = foods
     organizations.find_owned_organization.return_value = Organization(
-        uuid4(), uuid4(), "Kitchen", OrganizationType.NGO, "Centro"
+        uuid4(),
+        uuid4(),
+        "Kitchen",
+        OrganizationType.NGO,
+        "Centro",
+        verification_status=VerificationStatus.VERIFIED,
     )
     fields = {
         "name": "Rice",
@@ -82,7 +94,12 @@ def test_invalid_food_is_rejected_before_save(foods, field, value):
 def test_expiration_uses_sao_paulo_date_at_utc_midnight(foods, expiration, accepted):
     service, repository, organizations = foods
     organizations.find_owned_organization.return_value = Organization(
-        uuid4(), uuid4(), "Kitchen", OrganizationType.NGO, "Centro"
+        uuid4(),
+        uuid4(),
+        "Kitchen",
+        OrganizationType.NGO,
+        "Centro",
+        verification_status=VerificationStatus.VERIFIED,
     )
     instant = datetime(2026, 11, 18, 1, tzinfo=UTC)
     with patch("app.application.services.foods.datetime") as clock:
@@ -119,7 +136,14 @@ def test_missing_food_is_reported(foods):
 @pytest.fixture
 def owned_food(foods):
     _, repository, organizations = foods
-    donor = Organization(uuid4(), uuid4(), "Kitchen", OrganizationType.NGO, "Centro")
+    donor = Organization(
+        uuid4(),
+        uuid4(),
+        "Kitchen",
+        OrganizationType.NGO,
+        "Centro",
+        verification_status=VerificationStatus.VERIFIED,
+    )
     food = Food(uuid4(), donor.id, "Rice", "Grains", Decimal("10"), date.max)
     repository.get_food.return_value = food
     repository.approved_food_quantity.return_value = Decimal("0")

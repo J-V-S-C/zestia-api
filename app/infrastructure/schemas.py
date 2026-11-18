@@ -1,11 +1,11 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, StringConstraints
 
-from app.application.entities import OrganizationType
+from app.application.entities import AccountRole, OrganizationType, VerificationStatus
 
 
 class Schema(BaseModel):
@@ -20,6 +20,8 @@ class OrganizationInput(Schema):
 
 class OrganizationResponse(OrganizationInput):
     id: UUID
+    verification_status: VerificationStatus
+    deleted_at: datetime | None
 
 
 class FoodInput(Schema):
@@ -47,9 +49,29 @@ class LoginInput(Schema):
 class AccountResponse(Schema):
     id: UUID
     email: str
+    role: AccountRole
 
 
 class TokenResponse(Schema):
     access_token: str
     token_type: Literal["bearer"] = "bearer"
     expires_in: int
+
+
+class RecoveryRequest(Schema):
+    email: EmailStr
+
+
+class RecoveryConfirmation(Schema):
+    token: SecretStr = Field(min_length=1, max_length=256)
+
+
+class VerificationSubmission(Schema):
+    evidence: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=20, max_length=1000)
+    ]
+
+
+class VerificationDecision(Schema):
+    status: VerificationStatus
+    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
