@@ -1,0 +1,103 @@
+{
+  "source": {
+    "kind": "synthetic",
+    "description": "Dados fictícios criados para demonstração acadêmica; não representam instituições, entrevistas, doações ou impacto reais."
+  },
+  "snapshot_date": "2026-11-19",
+  "organizations": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "name": "Mercado Exemplo",
+      "type": "SUPERMARKET",
+      "location": "Porto Alegre — cenário fictício"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000002",
+      "name": "Cozinha Exemplo",
+      "type": "COMMUNITY_KITCHEN",
+      "location": "Porto Alegre — cenário fictício"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000003",
+      "name": "ONG Exemplo",
+      "type": "NGO",
+      "location": "Porto Alegre — cenário fictício"
+    }
+  ],
+  "foods": [
+    {
+      "id": "00000000-0000-0000-0000-00000000000b",
+      "donor_organization_id": "00000000-0000-0000-0000-000000000001",
+      "name": "Arroz",
+      "category": "Grãos",
+      "quantity_kg": "20.000",
+      "expiration_date": "2026-11-22"
+    },
+    {
+      "id": "00000000-0000-0000-0000-00000000000c",
+      "donor_organization_id": "00000000-0000-0000-0000-000000000001",
+      "name": "Feijão",
+      "category": "Grãos",
+      "quantity_kg": "8.000",
+      "expiration_date": "2026-11-20"
+    },
+    {
+      "id": "00000000-0000-0000-0000-00000000000d",
+      "donor_organization_id": "00000000-0000-0000-0000-000000000002",
+      "name": "Pão",
+      "category": "Panificação",
+      "quantity_kg": "5.000",
+      "expiration_date": "2026-11-18"
+    }
+  ],
+  "requests": [
+    {
+      "id": "00000000-0000-0000-0000-000000000015",
+      "food_id": "00000000-0000-0000-0000-00000000000b",
+      "recipient_organization_id": "00000000-0000-0000-0000-000000000002",
+      "quantity_kg": "12.000",
+      "status": "APPROVED",
+      "created_at": "2026-11-17T12:00:00-03:00"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000016",
+      "food_id": "00000000-0000-0000-0000-00000000000b",
+      "recipient_organization_id": "00000000-0000-0000-0000-000000000003",
+      "quantity_kg": "6.000",
+      "status": "PENDING",
+      "created_at": "2026-11-17T12:00:00-03:00"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000017",
+      "food_id": "00000000-0000-0000-0000-00000000000b",
+      "recipient_organization_id": "00000000-0000-0000-0000-000000000002",
+      "quantity_kg": "4.000",
+      "status": "PENDING",
+      "created_at": "2026-11-17T12:00:00-03:00"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000018",
+      "food_id": "00000000-0000-0000-0000-00000000000c",
+      "recipient_organization_id": "00000000-0000-0000-0000-000000000003",
+      "quantity_kg": "3.000",
+      "status": "PENDING",
+      "created_at": "2026-11-17T12:00:00-03:00"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000019",
+      "food_id": "00000000-0000-0000-0000-00000000000d",
+      "recipient_organization_id": "00000000-0000-0000-0000-000000000001",
+      "quantity_kg": "1.000",
+      "status": "PENDING",
+      "created_at": "2026-11-17T12:00:00-03:00"
+    },
+    {
+      "id": "00000000-0000-0000-0000-00000000001a",
+      "food_id": "00000000-0000-0000-0000-00000000000d",
+      "recipient_organization_id": "00000000-0000-0000-0000-000000000003",
+      "quantity_kg": "1.000",
+      "status": "REJECTED",
+      "created_at": "2026-11-17T12:00:00-03:00"
+    }
+  ]
+}

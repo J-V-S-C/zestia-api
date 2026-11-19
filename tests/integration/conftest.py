@@ -33,7 +33,13 @@ def postgres() -> Iterator[Engine]:
 def database(postgres: Engine) -> Iterator[Engine]:
     def clear() -> None:
         with postgres.begin() as connection:
-            connection.execute(text("TRUNCATE organizations, accounts"))
+            connection.execute(
+                text(
+                    "TRUNCATE recovery_rate_limits, lifecycle_events, account_recovery, "
+                    "auth_sessions, "
+                    "food_requests, foods, organizations, accounts"
+                )
+            )
 
     clear()
     yield postgres
@@ -46,6 +52,11 @@ def client(database: Engine) -> Iterator[TestClient]:
         _env_file=None,
         database_url=database.url.render_as_string(hide_password=False),
         jwt_secret="a-test-secret-at-least-32-characters-long",
+        jwt_issuer="zestia-test",
+        jwt_audience="zestia-test-api",
+        access_token_minutes=15,
+        cors_origins=["https://frontend.zestia.test"],
+        admin_email="reserved-admin@example.com",
     )
     with TestClient(create_app(settings)) as client:
         yield client

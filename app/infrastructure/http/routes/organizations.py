@@ -1,46 +1,34 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Query, Request, Response
+from fastapi import APIRouter, Query, Response
 
-from app.infrastructure.dependencies import (
-    AccountDependency,
-    AuthenticationDependency,
-    OrganizationsDependency,
-)
-from app.infrastructure.schemas import (
-    AccountResponse,
-    LoginInput,
+from app.infrastructure.http.authentication import AccountDependency
+from app.infrastructure.http.dtos import (
     OrganizationInput,
     OrganizationResponse,
-    RegistrationInput,
-    TokenResponse,
+)
+from app.infrastructure.http.providers import (
+    OrganizationsDependency,
 )
 
-router = APIRouter(prefix="/api/v1")
+router = APIRouter()
 
 
-@router.post("/auth/register", response_model=AccountResponse, status_code=201, tags=["auth"])
-def register(payload: RegistrationInput, service: AuthenticationDependency) -> AccountResponse:
-    return AccountResponse.model_validate(
-        service.register(str(payload.email), payload.password.get_secret_value())
-    )
-
-
-@router.post("/auth/login", response_model=TokenResponse, tags=["auth"])
-def login(
-    payload: LoginInput, service: AuthenticationDependency, request: Request
-) -> TokenResponse:
-    account = service.login(str(payload.email), payload.password.get_secret_value())
-    return TokenResponse(
-        access_token=request.app.state.tokens.issue(account.id),
-        expires_in=request.app.state.settings.access_token_minutes * 60,
-    )
-
-
-@router.get("/auth/me", response_model=AccountResponse, tags=["auth"])
-def me(account: AccountDependency) -> AccountResponse:
-    return AccountResponse.model_validate(account)
+@router.get(
+    "/auth/me/organization",
+    response_model=OrganizationResponse,
+    tags=["organizations"],
+    summary="Get the logged-in account's active organization",
+    responses={
+        401: {"description": "Authentication required"},
+        404: {"description": "The account has no active organization"},
+    },
+)
+def own_organization(
+    account: AccountDependency, service: OrganizationsDependency
+) -> OrganizationResponse:
+    return OrganizationResponse.model_validate(service.owned(account.id))
 
 
 @router.post(
@@ -96,3 +84,31 @@ def delete_organization(
 ) -> Response:
     service.delete(account.id, organization_id)
     return Response(status_code=204)
+
+
+@router.post(
+    "/organizations/{organization_id}/restore",
+    response_model=OrganizationResponse,
+    tags=["organizations"],
+)
+def restore_organization(
+    organization_id: UUID, account: AccountDependency, service: OrganizationsDependency
+) -> OrganizationResponse:
+    return OrganizationResponse.model_validate(service.restore(account.id, organization_id))
+
+
+@router.get(
+    "/auth/me/organizations/archived",
+    response_model=list[OrganizationResponse],
+    tags=["organizations"],
+)
+def archived_organizations(
+    account: AccountDependency,
+    service: OrganizationsDependency,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+):
+    return [
+        OrganizationResponse.model_validate(item)
+        for item in service.archived(account.id, offset, limit)
+    ]

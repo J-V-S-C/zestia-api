@@ -1,28 +1,45 @@
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from app.application.entities import Account
 from app.application.errors import BusinessError, InvalidInput, Unauthenticated
-from app.application.interfaces import AccountRepository, PasswordHasher
+from app.application.ports.repositories import AccountRepository, OrganizationRepository
+from app.application.ports.security import PasswordHasher
 
 
 class AuthenticationService:
-    def __init__(self, repository: AccountRepository, hasher: PasswordHasher) -> None:
+    def __init__(
+        self,
+        repository: AccountRepository,
+        hasher: PasswordHasher,
+        reserved_admin_email: str,
+        organizations: OrganizationRepository,
+    ) -> None:
         self.repository = repository
         self.hasher = hasher
+        self.reserved_admin_email = reserved_admin_email.strip().casefold()
+        self.organizations = organizations
 
     def register(self, email: str, password: str) -> Account:
-        if not 12 <= len(password) <= 128:
-            raise InvalidInput("invalid_password", "Password must contain 12–128 characters.")
+        if not 8 <= len(password) <= 128:
+            raise InvalidInput("invalid_password", "Password must contain 8–128 characters.")
         email = email.strip().casefold()
+        if email == self.reserved_admin_email:
+            raise BusinessError("email_unavailable", "Email is unavailable for registration.")
         if self.repository.find_account(email):
             raise BusinessError("email_registered", "Email is already registered.")
         account = Account(uuid4(), email, self.hasher.hash(password))
         self.repository.save_account(account)
         return account
 
+    def close(self, account_id: UUID) -> None:
+        organization = self.organizations.find_owned_organization(account_id, lock=True)
+        if organization is not None:
+            self.organizations.delete_organization(organization)
+        self.repository.delete_account(account_id)
+
     def login(self, email: str, password: str) -> Account:
         account = self.repository.find_account(email.strip().casefold())
         valid = self.hasher.verify(password, account.password_hash if account else None)
-        if account is None or not valid:
+        if account is None or account.deleted_at is not None or not valid:
             raise Unauthenticated("invalid_credentials", "Email or password is incorrect.")
         return account

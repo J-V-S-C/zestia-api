@@ -1,0 +1,15 @@
+**
+!Dockerfile
+!pyproject.toml
+!requirements.txt
+!alembic.ini
+!app/
+!app/**
+!migrations/
+!migrations/**
+!scripts/
+!scripts/admin.py
+**/__pycache__
+**/*.pyc
+**/.env
+**/.env.*

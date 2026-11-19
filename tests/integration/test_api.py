@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from hashlib import sha256
 from uuid import uuid4
 
 import jwt
@@ -99,19 +100,11 @@ def test_concurrent_creations_preserve_one_organization_per_account(
 ) -> None:
     from threading import Barrier
 
-    from app.infrastructure.repository import SqlAlchemyRepository
-
     headers = sign_in(client)
     barrier = Barrier(2)
-    original_save = SqlAlchemyRepository.save_organization
-
-    def simultaneous_save(repository, organization):
-        barrier.wait(timeout=10)
-        original_save(repository, organization)
-
-    monkeypatch.setattr(SqlAlchemyRepository, "save_organization", simultaneous_save)
 
     def create(_: int) -> int:
+        barrier.wait(timeout=10)
         return client.post(
             "/api/v1/organizations", headers=headers, json=organization_payload()
         ).status_code
@@ -124,25 +117,19 @@ def test_concurrent_creations_preserve_one_organization_per_account(
 def test_deletion_with_dependent_records_is_rejected(client: TestClient, database: Engine) -> None:
     headers = sign_in(client)
     created = client.post("/api/v1/organizations", headers=headers, json=organization_payload())
-    # Exercise RN-02 with a real referencing record, without implementing E02/E03 models.
     with database.begin() as connection:
         connection.execute(
             text(
-                "CREATE TABLE e01_test_reference "
-                "(organization_id uuid REFERENCES organizations(id) ON DELETE RESTRICT)"
-            )
+                "INSERT INTO foods "
+                "(id, donor_organization_id, name, category, quantity_kg, expiration_date) "
+                "VALUES (:food_id, :organization_id, 'Rice', 'Grains', 1, CURRENT_DATE)"
+            ),
+            {"food_id": uuid4(), "organization_id": created.json()["id"]},
         )
-        connection.execute(
-            text("INSERT INTO e01_test_reference VALUES (:id)"), {"id": created.json()["id"]}
-        )
-    try:
-        response = client.delete(created.headers["Location"], headers=headers)
-        assert response.status_code == 409, response.text
-        assert response.json()["error"]["code"] == "organization_in_use"
-        assert client.get(created.headers["Location"], headers=headers).status_code == 200
-    finally:
-        with database.begin() as connection:
-            connection.execute(text("DROP TABLE e01_test_reference"))
+    response = client.delete(created.headers["Location"], headers=headers)
+    assert response.status_code == 409, response.text
+    assert response.json()["error"]["code"] == "organization_in_use"
+    assert client.get(created.headers["Location"], headers=headers).status_code == 200
 
 
 def test_duplicate_email_and_login_errors(client: TestClient, database: Engine) -> None:
@@ -163,15 +150,42 @@ def test_duplicate_email_and_login_errors(client: TestClient, database: Engine) 
         assert PASSWORD not in password_hash
 
 
-@pytest.mark.parametrize("kind", ["expired", "wrong_signature", "malformed", "missing_expiration"])
-def test_invalid_tokens(client: TestClient, kind: str) -> None:
-    secret = "a-test-secret-at-least-32-characters-long"
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "expired",
+        "wrong_signature",
+        "malformed",
+        "missing_expiration",
+        "wrong_issuer",
+        "wrong_audience",
+        "missing_subject",
+        "missing_issued_at",
+        "missing_issuer",
+        "missing_audience",
+        "missing_session_id",
+        "invalid_subject",
+        "future_issued_at",
+        "unsigned",
+        "wrong_algorithm",
+    ],
+)
+def test_invalid_tokens(client: TestClient, database: Engine, kind: str) -> None:
+    # A long test-only key permits constructing HS384 tokens without a weak-key warning;
+    # the API must still reject that algorithm even when the signature is otherwise valid.
+    secret = "jwt-validation-test-secret-at-least-64-characters-for-hs384-testing"
+    client.app.state.tokens.secret = secret
+    headers = sign_in(client)
+    account = client.get("/api/v1/auth/me", headers=headers)
+    assert account.status_code == 200
+    account_id = account.json()["id"]
     claims = {
-        "sub": str(uuid4()),
+        "sub": account_id,
+        "jti": str(uuid4()),
         "iat": datetime.now(UTC),
         "exp": datetime.now(UTC) + timedelta(minutes=5),
-        "iss": "realimenta",
-        "aud": "realimenta-api",
+        "iss": client.app.state.settings.jwt_issuer,
+        "aud": client.app.state.settings.jwt_audience,
     }
     if kind == "expired":
         claims["exp"] = datetime.now(UTC) - timedelta(minutes=5)
@@ -179,7 +193,46 @@ def test_invalid_tokens(client: TestClient, kind: str) -> None:
         secret = "a-different-secret-at-least-32-characters-long"
     elif kind == "missing_expiration":
         claims.pop("exp")
-    token = "invalid" if kind == "malformed" else jwt.encode(claims, secret, algorithm="HS256")
+    elif kind == "wrong_issuer":
+        claims["iss"] = "untrusted-issuer"
+    elif kind == "wrong_audience":
+        claims["aud"] = "another-api"
+    elif kind.startswith("missing_"):
+        claims.pop(
+            {
+                "missing_subject": "sub",
+                "missing_issued_at": "iat",
+                "missing_issuer": "iss",
+                "missing_audience": "aud",
+                "missing_session_id": "jti",
+            }[kind]
+        )
+    elif kind == "invalid_subject":
+        claims["sub"] = "not-a-uuid"
+    elif kind == "future_issued_at":
+        claims["iat"] = datetime.now(UTC) + timedelta(minutes=10)
+    if kind == "malformed":
+        token = "invalid"
+    elif kind == "unsigned":
+        token = jwt.encode(claims, None, algorithm="none")
+    else:
+        token = jwt.encode(
+            claims, secret, algorithm="HS384" if kind == "wrong_algorithm" else "HS256"
+        )
+    # Keep the account and persisted session valid so rejection must come from JWT validation.
+    # Otherwise a nonexistent account/session could hide a broken signature/claim check.
+    with database.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO auth_sessions (token_hash, account_id, expires_at) "
+                "VALUES (:hash, :account, :expiry)"
+            ),
+            {
+                "hash": sha256(token.encode()).hexdigest(),
+                "account": account_id,
+                "expiry": datetime.now(UTC) + timedelta(minutes=15),
+            },
+        )
     assert (
         client.get(
             "/api/v1/organizations", headers={"Authorization": f"Bearer {token}"}
@@ -242,6 +295,11 @@ def test_health_reports_database_failure_without_leaking_credentials():
         _env_file=None,
         database_url="postgresql+psycopg://invalid:private-password@127.0.0.1:1/unavailable",
         jwt_secret="test-secret-at-least-32-characters-long",
+        jwt_issuer="zestia-test",
+        jwt_audience="zestia-test-api",
+        access_token_minutes=15,
+        cors_origins=[],
+        admin_email="reserved-admin@example.com",
     )
     with TestClient(create_app(settings)) as unhealthy:
         assert unhealthy.get("/health/live").json() == {"status": "ok"}
@@ -252,7 +310,10 @@ def test_health_reports_database_failure_without_leaking_credentials():
 
 
 def test_cors_allows_configured_frontend_only(client):
-    for origin, allowed in [("http://localhost:3000", True), ("https://untrusted.example", False)]:
+    for origin, allowed in [
+        ("https://frontend.zestia.test", True),
+        ("https://untrusted.example", False),
+    ]:
         response = client.options(
             "/api/v1/organizations",
             headers={

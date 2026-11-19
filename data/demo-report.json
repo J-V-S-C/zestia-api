@@ -1,0 +1,50 @@
+{
+  "source": {
+    "kind": "synthetic",
+    "description": "Dados fictícios criados para demonstração acadêmica; não representam instituições, entrevistas, doações ou impacto reais."
+  },
+  "snapshot_date": "2026-11-19",
+  "registered_food_kg": "33.000",
+  "requested_food_kg": "27.000",
+  "approved_food_kg": "12.000",
+  "request_counts": {
+    "PENDING": 4,
+    "APPROVED": 1,
+    "REJECTED": 1
+  },
+  "pending_quantity_and_expiry_checks": [
+    {
+      "request_id": "00000000-0000-0000-0000-000000000019",
+      "food": "Pão",
+      "requested_kg": "1.000",
+      "available_kg": "5.000",
+      "expiration_date": "2026-11-18",
+      "check": "EXPIRED"
+    },
+    {
+      "request_id": "00000000-0000-0000-0000-000000000018",
+      "food": "Feijão",
+      "requested_kg": "3.000",
+      "available_kg": "8.000",
+      "expiration_date": "2026-11-20",
+      "check": "WITHIN_QUANTITY_AND_EXPIRY_LIMITS"
+    },
+    {
+      "request_id": "00000000-0000-0000-0000-000000000016",
+      "food": "Arroz",
+      "requested_kg": "6.000",
+      "available_kg": "8.000",
+      "expiration_date": "2026-11-22",
+      "check": "WITHIN_QUANTITY_AND_EXPIRY_LIMITS"
+    },
+    {
+      "request_id": "00000000-0000-0000-0000-000000000017",
+      "food": "Arroz",
+      "requested_kg": "4.000",
+      "available_kg": "8.000",
+      "expiration_date": "2026-11-22",
+      "check": "WITHIN_QUANTITY_AND_EXPIRY_LIMITS"
+    }
+  ],
+  "interpretation": "Prioritize unexpired food with earlier expiration. Checks are independent: pending requests do not reserve quantity. Competing requests require a fresh balance check and authorized, verified donor approval through the API. Approved kg are not delivered kg."
+}

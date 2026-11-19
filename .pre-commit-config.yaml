@@ -1,0 +1,10 @@
+repos:
+  - repo: local
+    hooks:
+      - id: zestia-verify
+        name: Zestia checks and unit tests
+        entry: .venv/bin/python scripts/verify.py --pre-commit
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]

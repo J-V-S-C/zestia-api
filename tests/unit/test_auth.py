@@ -3,10 +3,11 @@ from uuid import uuid4
 
 import pytest
 
-from app.application.auth import AuthenticationService
 from app.application.entities import Account
 from app.application.errors import BusinessError, InvalidInput, Unauthenticated
-from app.application.interfaces import AccountRepository, PasswordHasher
+from app.application.ports.repositories import AccountRepository, OrganizationRepository
+from app.application.ports.security import PasswordHasher
+from app.application.services.auth import AuthenticationService
 
 
 @pytest.fixture
@@ -15,10 +16,46 @@ def auth():
     repository.find_account.return_value = None
     hasher = Mock(spec=PasswordHasher)
     hasher.hash.return_value = "hashed-password"
-    return AuthenticationService(repository, hasher), repository, hasher
+    organizations = Mock(spec=OrganizationRepository)
+    organizations.find_owned_organization.return_value = None
+    return (
+        AuthenticationService(repository, hasher, "admin@example.com", organizations),
+        repository,
+        hasher,
+    )
 
 
-@pytest.mark.parametrize("length", [12, 128])
+@pytest.mark.parametrize("email", ["admin@example.com", "ADMIN@EXAMPLE.COM", " Admin@Example.com "])
+@pytest.mark.parametrize("password", ["admin-bootstrap-password", "different-password"])
+def test_reserved_admin_email_cannot_register_before_bootstrap(auth, email, password):
+    service, repository, hasher = auth
+    with pytest.raises(BusinessError) as error:
+        service.register(email, password)
+    assert error.value.code == "email_unavailable"
+    repository.find_account.assert_not_called()
+    repository.save_account.assert_not_called()
+    hasher.hash.assert_not_called()
+
+
+def test_reservation_normalizes_configured_admin_email(auth):
+    _, repository, hasher = auth
+    service = AuthenticationService(
+        repository, hasher, " ADMIN@Example.COM ", Mock(spec=OrganizationRepository)
+    )
+    with pytest.raises(BusinessError):
+        service.register("admin@example.com", "password8")
+    repository.save_account.assert_not_called()
+
+
+def test_reserved_admin_can_still_log_in_with_stored_credentials(auth):
+    service, repository, hasher = auth
+    account = Account(uuid4(), "admin@example.com", "stored-hash")
+    repository.find_account.return_value = account
+    hasher.verify.return_value = True
+    assert service.login("ADMIN@example.com", "password8") == account
+
+
+@pytest.mark.parametrize("length", [8, 128])
 def test_registration_normalizes_email_and_persists_only_hash(auth, length):
     service, repository, hasher = auth
     password = "x" * length
@@ -30,7 +67,7 @@ def test_registration_normalizes_email_and_persists_only_hash(auth, length):
     assert password not in repr(account)
 
 
-@pytest.mark.parametrize("length", [0, 11, 129])
+@pytest.mark.parametrize("length", [0, 7, 129])
 def test_invalid_password_does_not_write_or_hash(auth, length):
     service, repository, hasher = auth
     with pytest.raises(InvalidInput) as error:
