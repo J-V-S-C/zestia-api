@@ -470,19 +470,19 @@ def test_food_update_failure_rolls_back_all_changes(client, database, listing):
 def test_edit_waits_for_locked_food_and_reads_committed_approved_total(
     client, database, listing, recipient, monkeypatch
 ):
-    from app.infrastructure.repository import SqlAlchemyRepository
+    from app.infrastructure.persistence.foods import SqlAlchemyFoodRepository
 
     headers, _, food, path = listing
     _, recipient_organization = recipient
     attempted = Event()
-    original_get = SqlAlchemyRepository.get_food
+    original_get = SqlAlchemyFoodRepository.get_food
 
     def observed_get(repository, food_id, *, lock=False):
         if lock:
             attempted.set()
         return original_get(repository, food_id, lock=lock)
 
-    monkeypatch.setattr(SqlAlchemyRepository, "get_food", observed_get)
+    monkeypatch.setattr(SqlAlchemyFoodRepository, "get_food", observed_get)
     with ThreadPoolExecutor(max_workers=1) as executor:
         # Hold the same food lock used by the approval transaction.
         with database.begin() as connection:
@@ -506,19 +506,19 @@ def test_edit_waits_for_locked_food_and_reads_committed_approved_total(
 def test_deletion_waits_for_in_flight_request_and_preserves_history(
     client, database, listing, recipient, monkeypatch
 ):
-    from app.infrastructure.repository import SqlAlchemyRepository
+    from app.infrastructure.persistence.foods import SqlAlchemyFoodRepository
 
     headers, _, food, path = listing
     _, recipient_organization = recipient
     attempted = Event()
-    original_get = SqlAlchemyRepository.get_food
+    original_get = SqlAlchemyFoodRepository.get_food
 
     def observed_get(repository, food_id, *, lock=False):
         if lock:
             attempted.set()
         return original_get(repository, food_id, lock=lock)
 
-    monkeypatch.setattr(SqlAlchemyRepository, "get_food", observed_get)
+    monkeypatch.setattr(SqlAlchemyFoodRepository, "get_food", observed_get)
     with ThreadPoolExecutor(max_workers=1) as executor:
         with database.begin() as connection:
             connection.execute(

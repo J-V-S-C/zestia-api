@@ -6,7 +6,7 @@ import pytest
 
 from app.application.entities import Organization, OrganizationType
 from app.application.errors import BusinessError, Forbidden, InvalidInput
-from app.application.interfaces import OrganizationRepository
+from app.application.ports.repositories import OrganizationRepository
 from app.application.services.organizations import OrganizationService
 
 

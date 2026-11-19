@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from dataclasses import replace
 from uuid import UUID, uuid4
 
 from app.application.entities import Organization, OrganizationType, VerificationStatus
-from app.application.errors import BusinessError, Forbidden
-from app.application.interfaces import OrganizationRepository
+from app.application.errors import BusinessError, Forbidden, NotFound
+from app.application.ports.repositories import OrganizationRepository
 
 
 class OrganizationService:
@@ -22,8 +24,17 @@ class OrganizationService:
     def get(self, organization_id: UUID) -> Organization:
         return self.repository.get_organization(organization_id)
 
+    def owned(self, account_id: UUID) -> Organization:
+        organization = self.repository.find_owned_organization(account_id)
+        if organization is None:
+            raise NotFound("organization_not_found", "The account has no active organization.")
+        return organization
+
     def list(self, offset: int, limit: int) -> list[Organization]:
         return self.repository.list_organizations(offset, limit)
+
+    def archived(self, account_id: UUID, offset: int, limit: int) -> list[Organization]:
+        return self.repository.list_archived_organizations(account_id, offset, limit)
 
     def update(
         self,

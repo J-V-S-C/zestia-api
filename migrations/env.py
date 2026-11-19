@@ -2,7 +2,7 @@ from alembic import context
 from sqlalchemy import create_engine, pool
 
 from app.config import Settings
-from app.infrastructure.models import Base
+from app.infrastructure.persistence.orm import Base
 
 url = context.config.attributes.get("database_url") or Settings().database_url
 if context.is_offline_mode():

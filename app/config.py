@@ -5,7 +5,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=Path(__file__).parents[1] / ".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).parents[1] / ".env", extra="ignore", hide_input_in_errors=True
+    )
     database_url: str
     jwt_secret: SecretStr
     jwt_issuer: str = Field(min_length=1)
@@ -13,6 +15,7 @@ class Settings(BaseSettings):
     access_token_minutes: int = Field(ge=1, le=1440)
     cors_origins: list[str]
     admin_email: EmailStr
+    recovery_email_enabled: bool = False
 
     @field_validator("jwt_secret")
     @classmethod
@@ -37,6 +40,23 @@ class RecoverySettings(BaseSettings):
     recovery_token_minutes: int = Field(ge=1, le=60)
     recovery_window_seconds: int = Field(ge=1)
     recovery_max_attempts: int = Field(ge=1)
+
+
+class SmtpSettings(BaseSettings):
+    model_config = Settings.model_config
+    smtp_host: str = Field(min_length=1, max_length=253, pattern=r"^[A-Za-z0-9.-]+$")
+    smtp_port: int = Field(ge=1, le=65535)
+    smtp_username: EmailStr
+    smtp_password: SecretStr
+    smtp_timeout_seconds: float = Field(gt=0, le=60, allow_inf_nan=False)
+
+    @field_validator("smtp_password")
+    @classmethod
+    def validate_app_password(cls, value: SecretStr) -> SecretStr:
+        password = value.get_secret_value().replace(" ", "")
+        if len(password) != 16 or not password.isascii() or not password.isalnum():
+            raise ValueError("Configure the 16-character Gmail App Password.")
+        return SecretStr(password)
 
 
 class AdminBootstrapSettings(BaseSettings):

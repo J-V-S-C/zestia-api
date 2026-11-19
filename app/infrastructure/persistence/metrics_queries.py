@@ -6,8 +6,8 @@ from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
 
 from app.application.entities import RequestStatus
-from app.application.services.metrics import MetricsSummary, OrganizationMetrics, RequestMetrics
-from app.infrastructure.models import FoodRecord, FoodRequestRecord, OrganizationRecord
+from app.application.query_results import MetricsSummary, OrganizationMetrics, RequestMetrics
+from app.infrastructure.persistence.orm import FoodRecord, FoodRequestRecord, OrganizationRecord
 
 
 def request_aggregates(status: RequestStatus | None) -> Select:

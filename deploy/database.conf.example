@@ -1,0 +1,6 @@
+# Copy to /opt/zestia/database.conf on the VPS and fill privately.
+# Preserve the database identity and credentials if a database already exists.
+# Values are literal; do not add surrounding quotes to passwords.
+POSTGRES_DB=zestia
+POSTGRES_USER=zestia
+POSTGRES_PASSWORD=

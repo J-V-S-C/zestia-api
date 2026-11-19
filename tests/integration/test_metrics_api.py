@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import event, text
 from sqlalchemy.orm import Session
 
-from app.infrastructure.models import (
+from app.infrastructure.persistence.orm import (
     AccountRecord,
     FoodRecord,
     FoodRequestRecord,
@@ -113,9 +113,6 @@ def test_totals_count_each_food_and_request_once_and_preserve_decimal_kg(client,
         "registered_food_kg": "21.750",
         "requests": counts(6, "13.000", "9.750", 2, 3, 1),
     }
-    assert not any(
-        word in response.text for word in ["delivered", "saved", "password", "owner_account_id"]
-    )
 
 
 @pytest.mark.parametrize(

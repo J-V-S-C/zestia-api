@@ -9,7 +9,7 @@ import pytest
 
 from app.application.entities import Food, Organization, OrganizationType, VerificationStatus
 from app.application.errors import BusinessError, Forbidden, InvalidInput, NotFound
-from app.application.interfaces import FoodRepository, OrganizationRepository
+from app.application.ports.repositories import FoodRepository, OrganizationRepository
 from app.application.services.foods import FoodService
 
 

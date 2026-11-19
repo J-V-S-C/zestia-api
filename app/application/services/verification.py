@@ -1,15 +1,9 @@
 from dataclasses import replace
-from typing import Protocol
 from uuid import UUID
 
 from app.application.entities import Account, AccountRole, Organization, VerificationStatus
 from app.application.errors import BusinessError, Forbidden, InvalidInput
-from app.application.interfaces import OrganizationRepository
-
-
-class VerificationRepository(OrganizationRepository, Protocol):
-    def save_verification_evidence(self, organization_id: UUID, evidence: str | None) -> None: ...
-    def get_verification_evidence(self, organization_id: UUID) -> str | None: ...
+from app.application.ports.repositories import VerificationRepository
 
 
 class VerificationService:

@@ -2,16 +2,22 @@ from uuid import UUID, uuid4
 
 from app.application.entities import Account
 from app.application.errors import BusinessError, InvalidInput, Unauthenticated
-from app.application.interfaces import AccountRepository, PasswordHasher
+from app.application.ports.repositories import AccountRepository, OrganizationRepository
+from app.application.ports.security import PasswordHasher
 
 
 class AuthenticationService:
     def __init__(
-        self, repository: AccountRepository, hasher: PasswordHasher, reserved_admin_email: str
+        self,
+        repository: AccountRepository,
+        hasher: PasswordHasher,
+        reserved_admin_email: str,
+        organizations: OrganizationRepository,
     ) -> None:
         self.repository = repository
         self.hasher = hasher
         self.reserved_admin_email = reserved_admin_email.strip().casefold()
+        self.organizations = organizations
 
     def register(self, email: str, password: str) -> Account:
         if not 8 <= len(password) <= 128:
@@ -26,6 +32,9 @@ class AuthenticationService:
         return account
 
     def close(self, account_id: UUID) -> None:
+        organization = self.organizations.find_owned_organization(account_id, lock=True)
+        if organization is not None:
+            self.organizations.delete_organization(organization)
         self.repository.delete_account(account_id)
 
     def login(self, email: str, password: str) -> Account:
