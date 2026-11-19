@@ -1,0 +1,258 @@
+[
+  {
+    "path": "/api/v1/auth/login",
+    "method": "post",
+    "status": 200,
+    "tags": [
+      "auth"
+    ]
+  },
+  {
+    "path": "/api/v1/auth/logout",
+    "method": "post",
+    "status": 204,
+    "tags": [
+      "auth"
+    ]
+  },
+  {
+    "path": "/api/v1/auth/me",
+    "method": "delete",
+    "status": 204,
+    "tags": [
+      "auth"
+    ]
+  },
+  {
+    "path": "/api/v1/auth/me",
+    "method": "get",
+    "status": 200,
+    "tags": [
+      "auth"
+    ]
+  },
+  {
+    "path": "/api/v1/auth/me/organization",
+    "method": "get",
+    "status": 200,
+    "tags": [
+      "organizations"
+    ]
+  },
+  {
+    "path": "/api/v1/auth/me/organizations/archived",
+    "method": "get",
+    "status": 200,
+    "tags": [
+      "organizations"
+    ]
+  },
+  {
+    "path": "/api/v1/auth/recovery/confirm",
+    "method": "post",
+    "status": 204,
+    "tags": [
+      "auth"
+    ]
+  },
+  {
+    "path": "/api/v1/auth/recovery/request",
+    "method": "post",
+    "status": 202,
+    "tags": [
+      "auth"
+    ]
+  },
+  {
+    "path": "/api/v1/auth/register",
+    "method": "post",
+    "status": 201,
+    "tags": [
+      "auth"
+    ]
+  },
+  {
+    "path": "/api/v1/foods",
+    "method": "get",
+    "status": 200,
+    "tags": [
+      "foods"
+    ]
+  },
+  {
+    "path": "/api/v1/foods",
+    "method": "post",
+    "status": 201,
+    "tags": [
+      "foods"
+    ]
+  },
+  {
+    "path": "/api/v1/foods/{food_id}",
+    "method": "delete",
+    "status": 204,
+    "tags": [
+      "foods"
+    ]
+  },
+  {
+    "path": "/api/v1/foods/{food_id}",
+    "method": "get",
+    "status": 200,
+    "tags": [
+      "foods"
+    ]
+  },
+  {
+    "path": "/api/v1/foods/{food_id}",
+    "method": "put",
+    "status": 200,
+    "tags": [
+      "foods"
+    ]
+  },
+  {
+    "path": "/api/v1/metrics",
+    "method": "get",
+    "status": 200,
+    "tags": [
+      "metrics"
+    ]
+  },
+  {
+    "path": "/api/v1/metrics/organizations",
+    "method": "get",
+    "status": 200,
+    "tags": [
+      "metrics"
+    ]
+  },
+  {
+    "path": "/api/v1/organizations",
+    "method": "get",
+    "status": 200,
+    "tags": [
+      "organizations"
+    ]
+  },
+  {
+    "path": "/api/v1/organizations",
+    "method": "post",
+    "status": 201,
+    "tags": [
+      "organizations"
+    ]
+  },
+  {
+    "path": "/api/v1/organizations/{organization_id}",
+    "method": "delete",
+    "status": 204,
+    "tags": [
+      "organizations"
+    ]
+  },
+  {
+    "path": "/api/v1/organizations/{organization_id}",
+    "method": "get",
+    "status": 200,
+    "tags": [
+      "organizations"
+    ]
+  },
+  {
+    "path": "/api/v1/organizations/{organization_id}",
+    "method": "put",
+    "status": 200,
+    "tags": [
+      "organizations"
+    ]
+  },
+  {
+    "path": "/api/v1/organizations/{organization_id}/restore",
+    "method": "post",
+    "status": 200,
+    "tags": [
+      "organizations"
+    ]
+  },
+  {
+    "path": "/api/v1/organizations/{organization_id}/verification",
+    "method": "get",
+    "status": 200,
+    "tags": [
+      "verification"
+    ]
+  },
+  {
+    "path": "/api/v1/organizations/{organization_id}/verification",
+    "method": "post",
+    "status": 200,
+    "tags": [
+      "verification"
+    ]
+  },
+  {
+    "path": "/api/v1/organizations/{organization_id}/verification/review",
+    "method": "post",
+    "status": 200,
+    "tags": [
+      "verification"
+    ]
+  },
+  {
+    "path": "/api/v1/requests",
+    "method": "get",
+    "status": 200,
+    "tags": [
+      "requests"
+    ]
+  },
+  {
+    "path": "/api/v1/requests",
+    "method": "post",
+    "status": 201,
+    "tags": [
+      "requests"
+    ]
+  },
+  {
+    "path": "/api/v1/requests/{request_id}",
+    "method": "get",
+    "status": 200,
+    "tags": [
+      "requests"
+    ]
+  },
+  {
+    "path": "/api/v1/requests/{request_id}/approve",
+    "method": "post",
+    "status": 200,
+    "tags": [
+      "requests"
+    ]
+  },
+  {
+    "path": "/api/v1/requests/{request_id}/reject",
+    "method": "post",
+    "status": 200,
+    "tags": [
+      "requests"
+    ]
+  },
+  {
+    "path": "/health/live",
+    "method": "get",
+    "status": 200,
+    "tags": [
+      "health"
+    ]
+  },
+  {
+    "path": "/health/ready",
+    "method": "get",
+    "status": 200,
+    "tags": [
+      "health"
+    ]
+  }
+]

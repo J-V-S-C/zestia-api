@@ -8,7 +8,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.application.entities import Food, Organization, OrganizationType
-from app.infrastructure.repository import SqlAlchemyRepository
+from app.infrastructure.persistence.foods import SqlAlchemyFoodRepository
+from app.infrastructure.persistence.organizations import SqlAlchemyOrganizationRepository
 
 
 def test_delete_does_not_misreport_unexpected_integrity_failure_as_dependency_conflict():
@@ -18,7 +19,7 @@ def test_delete_does_not_misreport_unexpected_integrity_failure_as_dependency_co
     session.scalar.return_value = False
     organization = Organization(uuid4(), uuid4(), "NGO", OrganizationType.NGO, "Centro")
     with pytest.raises(IntegrityError) as raised:
-        SqlAlchemyRepository(session).delete_organization(organization)
+        SqlAlchemyOrganizationRepository(session).delete_organization(organization)
     assert raised.value is error
 
 
@@ -28,5 +29,5 @@ def test_food_delete_preserves_unexpected_integrity_errors():
     session.flush.side_effect = error
     food = Food(uuid4(), uuid4(), "Rice", "Grains", Decimal("1"), date.max)
     with pytest.raises(IntegrityError) as raised:
-        SqlAlchemyRepository(session).delete_food(food)
+        SqlAlchemyFoodRepository(session).delete_food(food)
     assert raised.value is error

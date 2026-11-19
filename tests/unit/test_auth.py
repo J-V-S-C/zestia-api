@@ -5,7 +5,8 @@ import pytest
 
 from app.application.entities import Account
 from app.application.errors import BusinessError, InvalidInput, Unauthenticated
-from app.application.interfaces import AccountRepository, PasswordHasher
+from app.application.ports.repositories import AccountRepository, OrganizationRepository
+from app.application.ports.security import PasswordHasher
 from app.application.services.auth import AuthenticationService
 
 
@@ -15,7 +16,13 @@ def auth():
     repository.find_account.return_value = None
     hasher = Mock(spec=PasswordHasher)
     hasher.hash.return_value = "hashed-password"
-    return AuthenticationService(repository, hasher, "admin@example.com"), repository, hasher
+    organizations = Mock(spec=OrganizationRepository)
+    organizations.find_owned_organization.return_value = None
+    return (
+        AuthenticationService(repository, hasher, "admin@example.com", organizations),
+        repository,
+        hasher,
+    )
 
 
 @pytest.mark.parametrize("email", ["admin@example.com", "ADMIN@EXAMPLE.COM", " Admin@Example.com "])
@@ -32,7 +39,9 @@ def test_reserved_admin_email_cannot_register_before_bootstrap(auth, email, pass
 
 def test_reservation_normalizes_configured_admin_email(auth):
     _, repository, hasher = auth
-    service = AuthenticationService(repository, hasher, " ADMIN@Example.COM ")
+    service = AuthenticationService(
+        repository, hasher, " ADMIN@Example.COM ", Mock(spec=OrganizationRepository)
+    )
     with pytest.raises(BusinessError):
         service.register("admin@example.com", "password8")
     repository.save_account.assert_not_called()

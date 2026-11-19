@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session
 
 from app.application.errors import InvalidInput
 from app.config import AdminBootstrapSettings
-from app.infrastructure.models import AccountRecord, RecoveryRecord
-from app.infrastructure.repository import SqlAlchemyRepository
+from app.infrastructure.persistence.accounts import SqlAlchemyAccountRepository
+from app.infrastructure.persistence.orm import AccountRecord, RecoveryRecord
 from scripts.admin import provision_admin
 
 pytestmark = [pytest.mark.integration, pytest.mark.e2e]
@@ -551,7 +551,7 @@ def test_retirement_invalidates_pending_recovery_tokens(client, database):
     with Session(database) as session, session.begin():
         provision_admin(session, bootstrap_settings(email="replacement@example.com"))
     with pytest.raises(InvalidInput), Session(database) as session, session.begin():
-        SqlAlchemyRepository(session).restore_account(digest)
+        SqlAlchemyAccountRepository(session).restore_account(digest)
     with Session(database) as session:
         assert session.get(RecoveryRecord, digest).used_at is not None
         assert session.get(AccountRecord, account_id).deleted_at is not None

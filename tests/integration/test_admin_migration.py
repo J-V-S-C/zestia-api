@@ -8,8 +8,8 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.config import AdminBootstrapSettings
-from app.infrastructure.models import AccountRecord
-from app.infrastructure.security import Argon2PasswordHasher
+from app.infrastructure.persistence.orm import AccountRecord
+from app.infrastructure.security.passwords import Argon2PasswordHasher
 from scripts.admin import provision_admin
 
 pytestmark = pytest.mark.integration

@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 from app.application.entities import Food, VerificationStatus
 from app.application.errors import BusinessError, Forbidden, InvalidInput
-from app.application.interfaces import FoodRepository, OrganizationRepository
+from app.application.ports.repositories import FoodRepository, OrganizationRepository
 
 
 class FoodService:

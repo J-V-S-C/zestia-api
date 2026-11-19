@@ -1,0 +1,10 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Exact public JWT fixture for the disposable CI database; never a deployment key"
+condition = "AND"
+targetRules = ["generic-api-key"]
+regexTarget = "secret"
+paths = ['''(^|/)tests/fixtures/ci\.env$''']
+regexes = ['''^zestia-ci-test-fixture-secret-at-least-32-characters$''']

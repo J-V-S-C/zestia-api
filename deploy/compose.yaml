@@ -1,0 +1,49 @@
+name: ${ZESTIA_PROJECT_NAME:?Set the dedicated Compose project name}
+services:
+  postgres:
+    image: postgres:17-alpine@sha256:526f86d93c6ea08fd3f1fe5605650cacc781b2c6013169a0ad8f42c7d3d84f32
+    restart: unless-stopped
+    env_file:
+      - path: ${ZESTIA_DATABASE_CONFIG:?Set the absolute database configuration path}
+        format: raw
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    security_opt: [no-new-privileges:true]
+  api:
+    image: ${ZESTIA_IMAGE:?Use the verified immutable image}
+    restart: unless-stopped
+    env_file:
+      - path: ${ZESTIA_RUNTIME_CONFIG:?Set the absolute application configuration path}
+        format: raw
+    environment:
+      ZESTIA_SITE: ${ZESTIA_SITE:?Set the public DNS hostname}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  caddy:
+    image: caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    restart: unless-stopped
+    environment:
+      ZESTIA_SITE: ${ZESTIA_SITE:?Set the public DNS hostname}
+    ports: ['80:80', '443:443', '443:443/udp']
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    security_opt: [no-new-privileges:true]
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

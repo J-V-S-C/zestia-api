@@ -10,9 +10,9 @@ from sqlalchemy.orm import Session
 
 from app.application.entities import AccountRole
 from app.config import AdminBootstrapSettings, Settings
-from app.infrastructure.models import AccountRecord, LifecycleEventRecord, RecoveryRecord
-from app.infrastructure.repository import SqlAlchemyRepository
-from app.infrastructure.security import Argon2PasswordHasher
+from app.infrastructure.persistence.accounts import SqlAlchemyAccountRepository
+from app.infrastructure.persistence.orm import AccountRecord, LifecycleEventRecord, RecoveryRecord
+from app.infrastructure.security.passwords import Argon2PasswordHasher
 
 
 def provision_admin(session: Session, settings: AdminBootstrapSettings) -> None:
@@ -40,7 +40,7 @@ def provision_admin(session: Session, settings: AdminBootstrapSettings) -> None:
         )
 
     now = datetime.now(UTC)
-    repository = SqlAlchemyRepository(session)
+    repository = SqlAlchemyAccountRepository(session)
     for previous in accounts:
         if previous.role == AccountRole.ADMIN and previous is not account:
             previous.role = AccountRole.USER

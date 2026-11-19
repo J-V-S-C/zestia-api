@@ -15,7 +15,11 @@ from app.application.entities import (
     VerificationStatus,
 )
 from app.application.errors import BusinessError, Forbidden, InvalidInput
-from app.application.interfaces import FoodRepository, FoodRequestRepository, OrganizationRepository
+from app.application.ports.repositories import (
+    FoodRepository,
+    FoodRequestRepository,
+    OrganizationRepository,
+)
 from app.application.services.requests import FoodRequestService
 
 

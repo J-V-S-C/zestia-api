@@ -7,7 +7,8 @@
 - All unit/integration tests, with coverage; skipped tests fail the gate.
 - Full migration downgrade and upgrade on the disposable test database.
 
-TEST_DATABASE_URL must point to a separate database ending in _test. Tests clear
+Use --pre-commit for unit tests and static checks without a database.
+Full verification (CI) requires TEST_DATABASE_URL ending in _test. Tests clear
 its records and migration checks drop/rebuild its tables. The name check helps
 prevent accidentally running these destructive checks against application data;
 it does not provide backups or secure the database. The application can use
@@ -34,7 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def require_test_database() -> str:
     value = os.environ.get("TEST_DATABASE_URL")
     if not value:
-        raise ValueError("Set TEST_DATABASE_URL in the environment or .env before verification.")
+        raise ValueError("Set TEST_DATABASE_URL in the environment before full verification.")
     try:
         url = make_url(value)
     except ArgumentError as error:
@@ -58,11 +59,18 @@ def require_no_skipped_tests(report: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--env-file", type=Path, default=ROOT / ".env")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--pre-commit", action="store_true", help="Run checks and unit tests without PostgreSQL."
+    )
+    mode.add_argument("--env-file", type=Path, help="Explicit configuration for full verification.")
     arguments = parser.parse_args()
-    load_dotenv(arguments.env_file)
+    if arguments.env_file is not None:
+        load_dotenv(arguments.env_file)
+    os.environ["PYTHON_DOTENV_DISABLED"] = "1"
     try:
-        database_url = require_test_database()
+        database_url = None if arguments.pre_commit else require_test_database()
+        run(sys.executable, "scripts/scan_secrets.py")
         run("git", "diff", "--check")
         run("git", "diff", "--cached", "--check")
         run(sys.executable, "-m", "pip", "check")
@@ -100,6 +108,22 @@ def main() -> int:
             "migrations",
             "scripts",
         )
+        if arguments.pre_commit:
+            with tempfile.TemporaryDirectory(prefix="zestia-unit-verification-") as directory:
+                report = Path(directory) / "pytest.xml"
+                run(
+                    sys.executable,
+                    "-m",
+                    "pytest",
+                    "tests/unit",
+                    "--strict-config",
+                    "--strict-markers",
+                    f"--junitxml={report}",
+                    "-q",
+                )
+                require_no_skipped_tests(report)
+            print("Pre-commit checks passed. Integration tests and migrations run in CI.")
+            return 0
         config = Config(str(ROOT / "alembic.ini"))
         config.attributes["database_url"] = database_url
         print("Migrating the test database and checking schema consistency.", flush=True)

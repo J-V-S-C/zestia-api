@@ -1,21 +1,9 @@
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from secrets import token_urlsafe
-from typing import Protocol
-from uuid import UUID
 
-from app.application.entities import Account
 from app.application.errors import InvalidInput
-
-
-class RecoveryDelivery(Protocol):
-    def __call__(self, email: str, token: str) -> None: ...
-
-
-class RecoveryRepository(Protocol):
-    def find_account(self, email: str) -> Account | None: ...
-    def save_recovery(self, account_id: UUID, digest: str, expires_at: datetime) -> bool: ...
-    def restore_account(self, digest: str) -> None: ...
+from app.application.ports.repositories import RecoveryRepository
 
 
 class RecoveryService:

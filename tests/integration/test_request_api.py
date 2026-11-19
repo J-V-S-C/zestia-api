@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session
 
 from app.application.errors import BusinessError
 from app.application.services.requests import FoodRequestService
-from app.infrastructure.repository import SqlAlchemyRepository
+from app.infrastructure.persistence.foods import SqlAlchemyFoodRepository
+from app.infrastructure.persistence.organizations import SqlAlchemyOrganizationRepository
+from app.infrastructure.persistence.requests import SqlAlchemyFoodRequestRepository
 from tests.integration.test_food_api import food_payload, organization, sign_in
 
 pytestmark = [pytest.mark.integration, pytest.mark.e2e]
@@ -319,8 +321,11 @@ def test_concurrent_approvals_in_independent_transactions_preserve_limits(
         # Bypass authentication's per-account lock to prove the food lock itself works.
         try:
             with Session(database) as session, session.begin():
-                repository = SqlAlchemyRepository(session)
-                service = FoodRequestService(repository, repository, repository)
+                service = FoodRequestService(
+                    SqlAlchemyFoodRequestRepository(session),
+                    SqlAlchemyFoodRepository(session),
+                    SqlAlchemyOrganizationRepository(session),
+                )
                 barrier.wait(timeout=10)
                 service.approve(account_id, UUID(request_id))
             return "approved"
@@ -343,14 +348,14 @@ def test_approval_waits_for_food_edit_and_uses_new_quantity(
     donor, _, recipient, _, food = participants
     created = create_request(client, recipient, food, "10")
     attempted = Event()
-    original_get = SqlAlchemyRepository.get_food
+    original_get = SqlAlchemyFoodRepository.get_food
 
     def observed_get(repository, food_id, *, lock=False):
         if lock:
             attempted.set()
         return original_get(repository, food_id, lock=lock)
 
-    monkeypatch.setattr(SqlAlchemyRepository, "get_food", observed_get)
+    monkeypatch.setattr(SqlAlchemyFoodRepository, "get_food", observed_get)
     with ThreadPoolExecutor(max_workers=1) as executor:
         with database.begin() as connection:
             connection.execute(
