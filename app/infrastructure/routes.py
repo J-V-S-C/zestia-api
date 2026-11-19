@@ -5,21 +5,28 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials
 
+from app.application.entities import RequestStatus
 from app.application.errors import Unauthenticated
 from app.infrastructure.dependencies import (
     AccountDependency,
     AuthenticationDependency,
     FoodsDependency,
+    MetricsDependency,
     OrganizationsDependency,
     RepositoryDependency,
+    RequestsDependency,
     bearer,
 )
 from app.infrastructure.schemas import (
     AccountResponse,
     FoodInput,
+    FoodRequestInput,
+    FoodRequestResponse,
     FoodResponse,
     LoginInput,
+    MetricsResponse,
     OrganizationInput,
+    OrganizationMetricsResponse,
     OrganizationResponse,
     RegistrationInput,
     TokenResponse,
@@ -189,3 +196,83 @@ def update_food(
 def delete_food(food_id: UUID, account: AccountDependency, service: FoodsDependency) -> Response:
     service.delete(account.id, food_id)
     return Response(status_code=204)
+
+
+@router.post("/requests", response_model=FoodRequestResponse, status_code=201, tags=["requests"])
+def create_request(
+    payload: FoodRequestInput,
+    account: AccountDependency,
+    service: RequestsDependency,
+    response: Response,
+) -> FoodRequestResponse:
+    request = service.create(account.id, **payload.model_dump())
+    response.headers["Location"] = f"/api/v1/requests/{request.id}"
+    return FoodRequestResponse.model_validate(request)
+
+
+@router.get("/requests", response_model=list[FoodRequestResponse], tags=["requests"])
+def list_requests(
+    account: AccountDependency,
+    service: RequestsDependency,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    status: RequestStatus | None = None,
+    donor_organization_id: UUID | None = None,
+    recipient_organization_id: UUID | None = None,
+) -> list[FoodRequestResponse]:
+    return [
+        FoodRequestResponse.model_validate(item)
+        for item in service.list(
+            account.id, offset, limit, status, donor_organization_id, recipient_organization_id
+        )
+    ]
+
+
+@router.get("/requests/{request_id}", response_model=FoodRequestResponse, tags=["requests"])
+def get_request(
+    request_id: UUID, account: AccountDependency, service: RequestsDependency
+) -> FoodRequestResponse:
+    return FoodRequestResponse.model_validate(service.get(account.id, request_id))
+
+
+@router.post(
+    "/requests/{request_id}/approve", response_model=FoodRequestResponse, tags=["requests"]
+)
+def approve_request(
+    request_id: UUID, account: AccountDependency, service: RequestsDependency
+) -> FoodRequestResponse:
+    return FoodRequestResponse.model_validate(service.approve(account.id, request_id))
+
+
+@router.post("/requests/{request_id}/reject", response_model=FoodRequestResponse, tags=["requests"])
+def reject_request(
+    request_id: UUID, account: AccountDependency, service: RequestsDependency
+) -> FoodRequestResponse:
+    return FoodRequestResponse.model_validate(service.reject(account.id, request_id))
+
+
+@router.get("/metrics", response_model=MetricsResponse, tags=["metrics"])
+def metrics(
+    account: AccountDependency,
+    service: MetricsDependency,
+    organization_id: UUID | None = None,
+    status: RequestStatus | None = None,
+) -> MetricsResponse:
+    return MetricsResponse.model_validate(service.summary(organization_id, status))
+
+
+@router.get(
+    "/metrics/organizations", response_model=list[OrganizationMetricsResponse], tags=["metrics"]
+)
+def organization_metrics(
+    account: AccountDependency,
+    service: MetricsDependency,
+    organization_id: UUID | None = None,
+    status: RequestStatus | None = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[OrganizationMetricsResponse]:
+    return [
+        OrganizationMetricsResponse.model_validate(item)
+        for item in service.organizations(organization_id, status, offset, limit)
+    ]

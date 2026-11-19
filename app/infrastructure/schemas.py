@@ -5,7 +5,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, StringConstraints
 
-from app.application.entities import AccountRole, OrganizationType, VerificationStatus
+from app.application.entities import (
+    AccountRole,
+    OrganizationType,
+    RequestStatus,
+    VerificationStatus,
+)
 
 
 class Schema(BaseModel):
@@ -36,6 +41,19 @@ class FoodResponse(FoodInput):
     donor_organization_id: UUID
 
 
+class FoodRequestInput(Schema):
+    food_id: UUID
+    quantity_kg: Decimal = Field(gt=0, max_digits=12, decimal_places=3)
+
+
+class FoodRequestResponse(FoodRequestInput):
+    id: UUID
+    donor_organization_id: UUID
+    recipient_organization_id: UUID
+    status: RequestStatus
+    created_at: datetime
+
+
 class RegistrationInput(Schema):
     email: EmailStr
     password: SecretStr = Field(min_length=8, max_length=128)
@@ -56,6 +74,29 @@ class TokenResponse(Schema):
     access_token: str
     token_type: Literal["bearer"] = "bearer"
     expires_in: int
+
+
+class RequestMetricsResponse(Schema):
+    total_requests: int
+    requested_food_kg: Decimal
+    approved_food_kg: Decimal
+    pending_requests: int
+    approved_requests: int
+    rejected_requests: int
+
+
+class MetricsResponse(Schema):
+    total_organizations: int
+    registered_food_kg: Decimal
+    requests: RequestMetricsResponse
+
+
+class OrganizationMetricsResponse(Schema):
+    organization_id: UUID
+    organization_name: str
+    registered_food_kg: Decimal
+    donation_requests: RequestMetricsResponse
+    recipient_requests: RequestMetricsResponse
 
 
 class RecoveryRequest(Schema):

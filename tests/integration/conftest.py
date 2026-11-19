@@ -56,6 +56,7 @@ def client(database: Engine) -> Iterator[TestClient]:
         jwt_audience="zestia-test-api",
         access_token_minutes=15,
         cors_origins=["https://frontend.zestia.test"],
+        admin_email="reserved-admin@example.com",
     )
     with TestClient(create_app(settings)) as client:
         yield client

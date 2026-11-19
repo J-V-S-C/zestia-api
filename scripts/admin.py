@@ -1,50 +1,94 @@
-"""Bootstrap/revoke an admin using private ADMIN_EMAIL and ADMIN_PASSWORD settings."""
+"""Synchronize the single admin with private ADMIN_EMAIL and ADMIN_PASSWORD settings."""
 
 import argparse
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from pydantic import ValidationError
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.application.entities import AccountRole
 from app.config import AdminBootstrapSettings, Settings
-from app.infrastructure.models import AccountRecord, LifecycleEventRecord
+from app.infrastructure.models import AccountRecord, LifecycleEventRecord, RecoveryRecord
+from app.infrastructure.repository import SqlAlchemyRepository
 from app.infrastructure.security import Argon2PasswordHasher
 
 
-def provision_admin(
-    session: Session, settings: AdminBootstrapSettings, *, revoke: bool = False
-) -> None:
+def provision_admin(session: Session, settings: AdminBootstrapSettings) -> None:
     email = str(settings.admin_email).strip().casefold()
     password = settings.admin_password.get_secret_value()
     hasher = Argon2PasswordHasher()
-    account = session.scalar(
-        select(AccountRecord).where(AccountRecord.email == email).with_for_update()
+    # Serialize even the first bootstrap, when no admin row exists to lock yet.
+    session.execute(select(func.pg_advisory_xact_lock(func.hashtext("zestia.admin.bootstrap"))))
+    accounts = list(
+        session.scalars(
+            select(AccountRecord)
+            .where(or_(AccountRecord.role == AccountRole.ADMIN, AccountRecord.email == email))
+            .order_by(AccountRecord.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
     )
+    account = next((record for record in accounts if record.email == email), None)
+    if account is not None and account.deleted_at is not None:
+        raise ValueError("Cannot provision a closed account. Use the recovery flow first.")
+    password_changed = account is not None and not hasher.verify(password, account.password_hash)
+    if password_changed and account.role != AccountRole.ADMIN:
+        raise ValueError(
+            "Configured password does not match the existing user account; no changes made."
+        )
+
+    now = datetime.now(UTC)
+    repository = SqlAlchemyRepository(session)
+    for previous in accounts:
+        if previous.role == AccountRole.ADMIN and previous is not account:
+            previous.role = AccountRole.USER
+            previous.deleted_at = previous.deleted_at or now
+            repository.revoke_all_sessions(previous.id)
+            for recovery in session.scalars(
+                select(RecoveryRecord).where(
+                    RecoveryRecord.account_id == previous.id, RecoveryRecord.used_at.is_(None)
+                )
+            ):
+                recovery.used_at = now
+            session.add(
+                LifecycleEventRecord(
+                    id=uuid4(),
+                    account_id=previous.id,
+                    action="ADMIN_RETIRED",
+                    reason="Account closed by configured single-admin replacement",
+                )
+            )
+    # Release the unique admin slot before granting it to the configured identity.
+    session.flush()
+
     if account is None:
-        if revoke:
-            raise ValueError("Admin account does not exist.")
         account = AccountRecord(
             id=uuid4(), email=email, password_hash=hasher.hash(password), role=AccountRole.USER
         )
         session.add(account)
         session.flush()
-    elif account.deleted_at is not None:
-        raise ValueError("Cannot provision a closed account. Use the recovery flow first.")
-    elif not hasher.verify(password, account.password_hash):
-        raise ValueError(
-            "Configured password does not match the existing account; no changes made."
+    if password_changed:
+        account.password_hash = hasher.hash(password)
+        repository.revoke_all_sessions(account.id)
+        session.add(
+            LifecycleEventRecord(
+                id=uuid4(),
+                account_id=account.id,
+                action="ADMIN_PASSWORD_ROTATED",
+                reason="Password synchronized from private bootstrap configuration",
+            )
         )
-    desired_role = AccountRole.USER if revoke else AccountRole.ADMIN
-    if account.role == desired_role:
+    if account.role == AccountRole.ADMIN:
+        session.flush()
         return
-    account.role = desired_role
+    account.role = AccountRole.ADMIN
     session.add(
         LifecycleEventRecord(
             id=uuid4(),
             account_id=account.id,
-            action="ADMIN_REVOKED" if revoke else "ADMIN_GRANTED",
+            action="ADMIN_GRANTED",
             reason="Local operator provisioning from private environment",
         )
     )
@@ -53,8 +97,7 @@ def provision_admin(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--revoke", action="store_true")
-    arguments = parser.parse_args()
+    parser.parse_args()
     try:
         bootstrap = AdminBootstrapSettings()
         settings = Settings()
@@ -67,7 +110,7 @@ def main() -> None:
     try:
         with Session(engine) as session, session.begin():
             try:
-                provision_admin(session, bootstrap, revoke=arguments.revoke)
+                provision_admin(session, bootstrap)
             except ValueError as error:
                 raise SystemExit(str(error)) from None
         print("Admin role configured.")

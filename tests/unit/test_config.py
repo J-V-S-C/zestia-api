@@ -21,6 +21,7 @@ def configuration():
         "jwt_audience": "zestia-test-api",
         "access_token_minutes": 27,
         "cors_origins": ["https://frontend.zestia.test"],
+        "admin_email": "reserved-admin@example.com",
     }
 
 
@@ -34,6 +35,7 @@ def configuration():
         {"access_token_minutes": 1441},
         {"jwt_issuer": ""},
         {"jwt_audience": ""},
+        {"admin_email": "invalid-email"},
     ],
 )
 def test_invalid_configuration_fails_before_serving_requests(configuration, overrides):
@@ -53,6 +55,7 @@ def test_missing_environment_settings_fail_without_fallbacks():
         "jwt_audience",
         "access_token_minutes",
         "cors_origins",
+        "admin_email",
     }
     assert all(item["type"] == "missing" for item in error.value.errors())
 
@@ -68,7 +71,7 @@ def test_loads_explicit_configuration(configuration, source, monkeypatch, tmp_pa
             monkeypatch.setenv(name, value)
         settings = Settings(_env_file=None)
     else:
-        env_file = tmp_path / ".env"
+        env_file = tmp_path / "settings.fixture"
         env_file.write_text("\n".join(f"{name}={value}" for name, value in environment.items()))
         settings = Settings(_env_file=env_file)
     assert settings.database_url == configuration["database_url"]
@@ -80,7 +83,7 @@ def test_loads_explicit_configuration(configuration, source, monkeypatch, tmp_pa
 
 
 def test_environment_overrides_dotenv(configuration, monkeypatch, tmp_path):
-    env_file = tmp_path / ".env"
+    env_file = tmp_path / "settings.fixture"
     env_file.write_text("JWT_ISSUER=dotenv-issuer\n")
     monkeypatch.setenv("JWT_ISSUER", "environment-issuer")
     del configuration["jwt_issuer"]

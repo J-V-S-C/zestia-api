@@ -2,7 +2,7 @@ from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
-from app.application.entities import Account, Food, Organization
+from app.application.entities import Account, Food, FoodRequest, Organization, RequestStatus
 
 
 class OrganizationRepository(Protocol):
@@ -41,3 +41,17 @@ class FoodRepository(Protocol):
     ) -> list[Food]: ...
     def approved_food_quantity(self, food_id: UUID) -> Decimal: ...
     def delete_food(self, food: Food) -> None: ...
+
+
+class FoodRequestRepository(Protocol):
+    def save_food_request(self, request: FoodRequest) -> None: ...
+    def get_food_request(self, request_id: UUID, *, lock: bool = False) -> FoodRequest: ...
+    def list_food_requests(
+        self,
+        organization_id: UUID,
+        offset: int,
+        limit: int,
+        status: RequestStatus | None = None,
+        donor_organization_id: UUID | None = None,
+        recipient_organization_id: UUID | None = None,
+    ) -> list[FoodRequest]: ...

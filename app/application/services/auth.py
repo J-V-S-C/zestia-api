@@ -6,14 +6,19 @@ from app.application.interfaces import AccountRepository, PasswordHasher
 
 
 class AuthenticationService:
-    def __init__(self, repository: AccountRepository, hasher: PasswordHasher) -> None:
+    def __init__(
+        self, repository: AccountRepository, hasher: PasswordHasher, reserved_admin_email: str
+    ) -> None:
         self.repository = repository
         self.hasher = hasher
+        self.reserved_admin_email = reserved_admin_email.strip().casefold()
 
     def register(self, email: str, password: str) -> Account:
         if not 8 <= len(password) <= 128:
             raise InvalidInput("invalid_password", "Password must contain 8–128 characters.")
         email = email.strip().casefold()
+        if email == self.reserved_admin_email:
+            raise BusinessError("email_unavailable", "Email is unavailable for registration.")
         if self.repository.find_account(email):
             raise BusinessError("email_registered", "Email is already registered.")
         account = Account(uuid4(), email, self.hasher.hash(password))
