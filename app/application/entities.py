@@ -25,6 +25,12 @@ class OrganizationType(StrEnum):
     COMMUNITY_KITCHEN = "COMMUNITY_KITCHEN"
 
 
+class RequestStatus(StrEnum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
 @dataclass(frozen=True)
 class Organization:
     id: UUID
@@ -81,3 +87,28 @@ class Food:
                 "Quantity must be positive, at most 999999999.999 kg, with up to 3 decimal places.",
             )
         object.__setattr__(self, "quantity_kg", self.quantity_kg.quantize(Decimal("0.001")))
+
+
+@dataclass(frozen=True)
+class FoodRequest:
+    id: UUID
+    food_id: UUID
+    donor_organization_id: UUID
+    recipient_organization_id: UUID
+    quantity_kg: Decimal
+    status: RequestStatus
+    created_at: datetime
+
+    def __post_init__(self) -> None:
+        if (
+            not self.quantity_kg.is_finite()
+            or not Decimal("0") < self.quantity_kg <= Decimal("999999999.999")
+            or self.quantity_kg != self.quantity_kg.quantize(Decimal("0.001"))
+        ):
+            raise InvalidInput(
+                "invalid_request_quantity",
+                "Quantity must be positive, at most 999999999.999 kg, with up to 3 decimal places.",
+            )
+        object.__setattr__(self, "quantity_kg", self.quantity_kg.quantize(Decimal("0.001")))
+        if not isinstance(self.status, RequestStatus):
+            raise InvalidInput("invalid_request_status", "Unsupported request status.")

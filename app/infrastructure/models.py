@@ -32,6 +32,14 @@ class AccountRecord(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+Index(
+    "accounts_single_admin_key",
+    AccountRecord.role,
+    unique=True,
+    postgresql_where=text("role = 'ADMIN'"),
+)
+
+
 class RateLimitRecord(Base):
     __tablename__ = "recovery_rate_limits"
     key: Mapped[str] = mapped_column(String(64), primary_key=True)

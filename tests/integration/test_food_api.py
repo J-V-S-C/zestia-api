@@ -310,7 +310,7 @@ def recipient(client):
 
 
 def seed_request(connection, food_id, recipient_id, status, quantity="1"):
-    # E03 endpoints are pending; these persisted fixtures exercise E02 history constraints.
+    # Persist each status directly to isolate E02 history constraints from request workflows.
     request_id = uuid4()
     connection.execute(
         text(
@@ -484,7 +484,7 @@ def test_edit_waits_for_locked_food_and_reads_committed_approved_total(
 
     monkeypatch.setattr(SqlAlchemyRepository, "get_food", observed_get)
     with ThreadPoolExecutor(max_workers=1) as executor:
-        # Simulate the lock contract required of the future E03 approval transaction.
+        # Hold the same food lock used by the approval transaction.
         with database.begin() as connection:
             connection.execute(
                 text("SELECT id FROM foods WHERE id = :id FOR UPDATE"), {"id": food["id"]}

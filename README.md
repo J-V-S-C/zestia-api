@@ -1,6 +1,6 @@
 # Zestia backend
 
-FastAPI + PostgreSQL 17. Organization and food CRUD are implemented; frontend, request workflows and metrics remain pending. [Requirements](../backlog.md) · [Architecture](../arch.md) · [Validation](../validation.md).
+FastAPI + PostgreSQL 17. Organization/food CRUD, request workflows and metrics are implemented. Live recovery email delivery awaits provider integration. [Requirements](../backlog.md) · [Architecture](../arch.md) · [Validation](../validation.md).
 
 ## One-time setup
 
@@ -79,7 +79,7 @@ python -m pytest tests/unit -q
 
 ## API notes
 
-All application paths start with `/api/v1`. Register/login under `/auth`; passwords must contain 8–128 characters. Use the returned bearer token for `/organizations` and `/foods`. Both resources support create, list, detail, update and delete. Swagger contains the complete contract.
+All application paths start with `/api/v1`. Register/login under `/auth`; passwords must contain 8–128 characters. Use the returned bearer token for `/organizations`, `/foods` and `/requests`. Organizations and foods support create, list, detail, update and delete. Swagger contains the complete contract.
 
 - Each active account owns at most one active organization. All organization types can donate; owners alone can modify their records.
 - Food lists accept `donor_organization_id`, `offset` and `limit` filters.
@@ -89,7 +89,32 @@ All application paths start with `/api/v1`. Register/login under `/auth`; passwo
 - Approved quantities limit reductions; any associated request blocks food deletion. Referenced organizations cannot be deleted.
 - Errors use `{"error":{"code":"...","message":"..."}}`, with HTTP 401/403/404/409/422/503 as appropriate.
 
-Request records currently support food integrity checks; request creation, approval/rejection and history endpoints remain E03. Detailed rules belong in the [backlog](../backlog.md).
+### Requests
+
+| Method | Path (under `/api/v1`) | Purpose |
+|---|---|---|
+| POST | `/requests` | Request `{ "food_id": "<UUID>", "quantity_kg": "1.125" }`; returns 201 and a Location header. |
+| GET | `/requests` | List the current organization's sent and received requests. |
+| GET | `/requests/{id}` | View a request as its donor or recipient. |
+| POST | `/requests/{id}/approve` | Donor approves a pending request. |
+| POST | `/requests/{id}/reject` | Donor rejects a pending request. |
+
+Creation derives the recipient from the authenticated owner. Responses include food, donor and recipient IDs, Decimal kg, status and a timezone-aware creation timestamp. History accepts `status`, `donor_organization_id`, `recipient_organization_id`, `offset` and `limit`; filters apply before pagination and cannot expose another organization's requests. Accounts without an organization receive an empty list.
+
+Pending requests do not reserve food. Creation and approval validate the approved balance under a food-row lock shared with food edits/deletion; approval also rechecks expiration. Only PENDING requests can be processed, and only their donor can process them. VERIFIED status is required for request creation and donor approval. Other verification statuses retain history access and may reject pending requests, including expired food. Detailed rules belong in the [backlog](../backlog.md).
+
+### Metrics
+
+| Method | Path (under `/api/v1`) | Purpose |
+|---|---|---|
+| GET | `/metrics` | Active organization count, registered kg and request totals/quantities/status counts. |
+| GET | `/metrics/organizations` | Organization breakdown separating requests for its donations from requests it made. |
+
+Both require an active authenticated session and accept `organization_id` and `status` (PENDING/APPROVED/REJECTED). Aggregates are platform-visible; individual request history remains participant-only. No account emails, credentials or individual request records are returned.
+
+The summary's `requests` contains `total_requests`, `requested_food_kg`, `approved_food_kg`, `pending_requests`, `approved_requests` and `rejected_requests`. An organization filter restricts registered food to that donor and includes each request involving it as donor or recipient once. The breakdown uses `donation_requests` for requests against its food and `recipient_requests` for requests it made. Sum each role separately across organizations; adding both roles would count the same requests twice.
+
+Status filters affect request figures only; organization counts and registered kg stay unchanged. Existing listings include expired food for historical accuracy. Archived organizations are excluded from organization counts/breakdown; persisted food/request history is retained. Unknown organization filters return zero totals/empty groups. Breakdown pagination uses `offset` and `limit` (1–100), after filtering, ordered by name/ID; it does not change summary totals. Each response uses one SQL snapshot. Quantities use Decimal kg with three decimal places, including zero; approved kg imply no delivery, consumption or waste reduction.
 
 ## Account lifecycle and organization review
 
@@ -104,11 +129,11 @@ Request records currently support food integrity checks; request creation, appro
 | GET | `/organizations/{id}/verification` | Authorized admin reads the submitted evidence. |
 | POST | `/organizations/{id}/verification/review` | Admin submits `{ "status": "VERIFIED", "reason": "..." }`. |
 
-New and existing organizations start PENDING after the migration. Only VERIFIED organizations can publish or edit food; owners can still delete unused listings. Owners cannot self-verify; the ADMIN account role is stored in the database. Admins cannot approve their own organizations. Reviewed identity/type changes require new evidence and review. Suspension prevents publication and cannot be cleared by owner edits. E03 must apply the same eligibility check to requests and approvals when those endpoints are built.
+New and existing organizations start PENDING after the migration. Only VERIFIED organizations can publish/edit food, create requests or approve donations; owners can still delete unused listings and reject pending requests. Owners cannot self-verify; the ADMIN account role is stored in the database. Admins cannot approve their own organizations. Reviewed identity/type changes require new evidence and review. Suspension prevents participation and cannot be cleared by owner edits.
 
 ### Admin seed
 
-[`scripts/admin.py`](scripts/admin.py) is the initial admin seed script. It creates the configured account if missing or grants ADMIN to an existing account with matching credentials. It can safely be rerun; it does not create sample organizations or food.
+[`scripts/admin.py`](scripts/admin.py) synchronizes the single admin with the configured credentials. It can safely be rerun; it does not create sample organizations or food.
 
 After applying migrations, set ADMIN_EMAIL and ADMIN_PASSWORD privately in `.env` or the environment, then run from `backend/`:
 
@@ -116,7 +141,23 @@ After applying migrations, set ADMIN_EMAIL and ADMIN_PASSWORD privately in `.env
 .venv/bin/python scripts/admin.py
 ```
 
-Passwords are stored as Argon2 hashes. Existing passwords are never overwritten and closed accounts are not reopened. Use `--revoke` to return the account to USER. `/auth/me` reports the stored role; public signup always creates USER accounts. Keep credentials out of Git and command-line arguments.
+Passwords are stored as Argon2 hashes. `/auth/me` reports the stored role; public signup always creates USER accounts. Keep credentials out of Git and command-line arguments.
+
+The API requires ADMIN_EMAIL at startup and reserves that email from public signup, even before bootstrap runs. Matching ignores letter case; signup returns 409 regardless of the supplied password. ADMIN_PASSWORD is only needed by the bootstrap script. Using that password with another email never grants privileges; authorization uses the stored role.
+
+Bootstrap enforces one admin after a successful transaction:
+
+| Input | Result |
+|---|---|
+| Same email/password | Keeps the same account, password hash and sessions; no duplicate grant event. |
+| Same admin email, different password | Updates its hash and revokes all sessions; fresh login with the configured password is required. |
+| Different email | Creates/grants the configured admin and soft-deletes the previous admin account, removes its role, revokes every session and invalidates pending recovery links. |
+| Existing ordinary user email | Promotes only when the configured password matches; otherwise rejects without retiring the current admin. |
+| Closed account, even with matching password | Rejects; bootstrap cannot bypass recovery. |
+
+Old admin rows remain as deleted USER records to preserve audit history and organization/food/request references; they cannot log in or use old tokens. This administrative retirement preserves linked records even when ordinary account closure would be blocked by those links. Replacement, password changes, session/recovery revocation and audit events commit together. Failure rolls everything back, leaving the previous admin usable. The old `--revoke` option is removed; changing the configured identity and running bootstrap performs replacement.
+
+A PostgreSQL unique index prevents a second ADMIN row, and a transaction advisory lock serializes bootstrap runs, including first creation. The new migration stops if multiple legacy admins exist: run the updated bootstrap with the intended credentials to consolidate them, then retry `python -m alembic upgrade head`. Migration never chooses an admin arbitrarily. Changing configuration alone does not update stored credentials: run bootstrap, then restart the API so signup reserves the current ADMIN_EMAIL.
 
 Admins must check identity, representation and supporting evidence; informal kitchens can submit alternative evidence. No registry or document provider is integrated.
 

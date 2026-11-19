@@ -1,12 +1,55 @@
+import json
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
+from textwrap import dedent
 from threading import Barrier
 
 import pytest
 from sqlalchemy import text
 
 pytestmark = [pytest.mark.integration, pytest.mark.e2e]
+
+
+def test_session_revocation_survives_fresh_api_process(client):
+    body, revoked = login(client, "restart@example.com")
+    active = {
+        "Authorization": "Bearer "
+        + client.post("/api/v1/auth/login", json=body).json()["access_token"]
+    }
+    assert client.post("/api/v1/auth/logout", headers=revoked).status_code == 204
+    settings = client.app.state.settings.model_dump(mode="json")
+    settings["jwt_secret"] = client.app.state.settings.jwt_secret.get_secret_value()
+    child = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            dedent("""
+            import json, sys
+            from fastapi.testclient import TestClient
+            from app.config import Settings
+            from app.main import create_app
+            data = json.load(sys.stdin)
+            settings = Settings(_env_file=None, **data['settings'])
+            with TestClient(create_app(settings)) as api:
+                results = [
+                    api.get('/api/v1/auth/me', headers=data['revoked']).status_code,
+                    api.get('/api/v1/auth/me', headers=data['active']).status_code,
+                    api.post('/api/v1/auth/logout', headers=data['active']).status_code,
+                ]
+            print(json.dumps(results))
+        """),
+        ],
+        input=json.dumps({"settings": settings, "revoked": revoked, "active": active}),
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=True,
+    )
+    assert json.loads(child.stdout) == [401, 200, 204]
+    assert client.get("/api/v1/auth/me", headers=active).status_code == 401
 
 
 def login(client, email):
@@ -164,6 +207,8 @@ def test_restore_owner_conflict_and_concurrency(client):
 def test_verification_permissions_evidence_transitions_and_donation_gate(client, database):
     _, owner = login(client, "org@example.com")
     _, admin = login(client, "admin@example.com")
+    owner_id = client.get("/api/v1/auth/me", headers=owner).json()["id"]
+    admin_id = client.get("/api/v1/auth/me", headers=admin).json()["id"]
     with database.begin() as connection:
         connection.execute(
             text("UPDATE accounts SET role = 'ADMIN' WHERE email = 'admin@example.com'")
@@ -199,7 +244,25 @@ def test_verification_permissions_evidence_transitions_and_donation_gate(client,
     assert client.put(published.headers["Location"], headers=owner, json=food).status_code == 403
     assert client.delete(published.headers["Location"], headers=owner).status_code == 204
     with database.connect() as connection:
-        assert connection.scalar(text("SELECT count(*) FROM lifecycle_events")) == 3
+        events = (
+            connection.execute(
+                text(
+                    "SELECT account_id, organization_id, action, reason, created_at "
+                    "FROM lifecycle_events ORDER BY created_at, id"
+                )
+            )
+            .mappings()
+            .all()
+        )
+        assert [
+            (str(event["account_id"]), event["action"], event["reason"]) for event in events
+        ] == [
+            (owner_id, "VERIFICATION_SUBMITTED", ""),
+            (admin_id, "VERIFICATION_VERIFIED", decision["reason"]),
+            (admin_id, "VERIFICATION_SUSPENDED", decision["reason"]),
+        ]
+        assert all(str(event["organization_id"]) == organization["id"] for event in events)
+        assert all(event["created_at"].utcoffset() is not None for event in events)
 
 
 def test_verified_identity_change_requires_new_review_and_no_self_review(client, database):

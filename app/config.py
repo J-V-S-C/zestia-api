@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     jwt_audience: str = Field(min_length=1)
     access_token_minutes: int = Field(ge=1, le=1440)
     cors_origins: list[str]
+    admin_email: EmailStr
 
     @field_validator("jwt_secret")
     @classmethod

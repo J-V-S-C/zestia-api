@@ -8,7 +8,10 @@ from app.application.entities import Account
 from app.application.errors import Unauthenticated
 from app.application.services.auth import AuthenticationService
 from app.application.services.foods import FoodService
+from app.application.services.metrics import MetricsService
 from app.application.services.organizations import OrganizationService
+from app.application.services.requests import FoodRequestService
+from app.infrastructure.metrics_repository import SqlAlchemyMetricsRepository
 from app.infrastructure.repository import SqlAlchemyRepository
 
 bearer = HTTPBearer(auto_error=False)
@@ -43,13 +46,27 @@ def get_organizations(repository: RepositoryDependency) -> OrganizationService:
 
 
 def get_auth(request: Request, repository: RepositoryDependency) -> AuthenticationService:
-    return AuthenticationService(repository, request.app.state.hasher)
+    return AuthenticationService(
+        repository, request.app.state.hasher, str(request.app.state.settings.admin_email)
+    )
 
 
 def get_foods(repository: RepositoryDependency) -> FoodService:
     return FoodService(repository, repository)
 
 
+def get_requests(repository: RepositoryDependency) -> FoodRequestService:
+    return FoodRequestService(repository, repository, repository)
+
+
 OrganizationsDependency = Annotated[OrganizationService, Depends(get_organizations)]
 AuthenticationDependency = Annotated[AuthenticationService, Depends(get_auth)]
 FoodsDependency = Annotated[FoodService, Depends(get_foods)]
+RequestsDependency = Annotated[FoodRequestService, Depends(get_requests)]
+
+
+def get_metrics(repository: RepositoryDependency) -> MetricsService:
+    return MetricsService(SqlAlchemyMetricsRepository(repository.session))
+
+
+MetricsDependency = Annotated[MetricsService, Depends(get_metrics)]
