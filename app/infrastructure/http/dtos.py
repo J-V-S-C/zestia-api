@@ -116,3 +116,8 @@ class VerificationSubmission(Schema):
 class VerificationDecision(Schema):
     status: VerificationStatus
     reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+
+
+class FoodAvailabilityResponse(Schema):
+    available_kg: Decimal
+    has_requests: bool

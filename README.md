@@ -213,3 +213,12 @@ Also configure `RECOVERY_TOKEN_MINUTES`, `RECOVERY_WINDOW_SECONDS` and `RECOVERY
 Delivery runs after the token transaction commits. The email contains a recovery code; submit it to `/auth/recovery/confirm` using its `token` field. The generic 202 response acknowledges the request, not successful delivery. SMTP/network errors produce a generic log entry without exception content, addresses, credentials or raw codes. There is no durable retry queue; after a delivery failure the user can request a new code within the configured limits. Inbox placement is not guaranteed. Automated tests use fake SMTP only; no real email or operator credentials are needed. Live account setup and a controlled operator delivery check remain necessary before RF-10 acceptance.
 
 The session migration requires existing clients to log in again. Frontends must call logout before clearing their local token. The frontend itself remains pending.
+
+## Food availability for the frontend
+
+Authenticated `GET /api/v1/foods/{food_id}/availability` returns `available_kg` and
+`has_requests` across all requests, without exposing participants or private history.
+Pending/rejected requests do not reduce availability. The read locks the food while
+calculating the aggregate to coordinate with quantity changes/approvals. Existing food
+response schemas are unchanged; no migration is required. Updated frontend uses this
+endpoint rather than estimating balances from its restricted request history.

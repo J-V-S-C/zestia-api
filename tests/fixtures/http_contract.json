@@ -112,6 +112,14 @@
     ]
   },
   {
+    "path": "/api/v1/foods/{food_id}/availability",
+    "method": "get",
+    "status": 200,
+    "tags": [
+      "foods"
+    ]
+  },
+  {
     "path": "/api/v1/metrics",
     "method": "get",
     "status": 200,

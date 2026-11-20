@@ -531,3 +531,25 @@ def test_deletion_waits_for_in_flight_request_and_preserves_history(
     assert response.status_code == 409, response.text
     assert response.json()["error"]["code"] == "food_in_use"
     assert client.get(path, headers=headers).json() == food
+
+
+def test_availability_uses_all_requests_without_disclosing_participants(
+    client, database, listing, recipient
+):
+    headers, donor, food, path = listing
+    recipient_headers, receiver = recipient
+    endpoint = path + "/availability"
+    assert client.get(endpoint).status_code == 401
+    initial = client.get(endpoint, headers=recipient_headers)
+    assert initial.status_code == 200
+    assert initial.json() == {"available_kg": "12.125", "has_requests": False}
+    with database.begin() as connection:
+        seed_request(connection, food["id"], receiver["id"], "PENDING", "9")
+        seed_request(connection, food["id"], receiver["id"], "REJECTED", "7")
+        seed_request(connection, food["id"], receiver["id"], "APPROVED", "2.125")
+    other_headers = sign_in(client, "availability-observer@example.com")
+    assert client.get(endpoint, headers=other_headers).json() == {
+        "available_kg": "10.000",
+        "has_requests": True,
+    }
+    assert client.get(f"/api/v1/foods/{uuid4()}/availability", headers=headers).status_code == 404

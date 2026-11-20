@@ -62,6 +62,13 @@ class SqlAlchemyFoodRepository:
             )
         )
 
+    def food_has_requests(self, food_id: UUID) -> bool:
+        return self.session.scalar(
+            select(
+                select(FoodRequestRecord.id).where(FoodRequestRecord.food_id == food_id).exists()
+            )
+        )
+
     def delete_food(self, food: Food) -> None:
         record = self.session.get(FoodRecord, food.id)
         self.session.delete(record)

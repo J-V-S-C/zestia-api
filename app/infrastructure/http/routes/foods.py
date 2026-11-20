@@ -5,6 +5,7 @@ from fastapi import APIRouter, Query, Response
 
 from app.infrastructure.http.authentication import AccountDependency
 from app.infrastructure.http.dtos import (
+    FoodAvailabilityResponse,
     FoodInput,
     FoodResponse,
 )
@@ -60,3 +61,12 @@ def update_food(
 def delete_food(food_id: UUID, account: AccountDependency, service: FoodsDependency) -> Response:
     service.delete(account.id, food_id)
     return Response(status_code=204)
+
+
+@router.get(
+    "/foods/{food_id}/availability", response_model=FoodAvailabilityResponse, tags=["foods"]
+)
+def food_availability(
+    food_id: UUID, account: AccountDependency, service: FoodsDependency
+) -> FoodAvailabilityResponse:
+    return FoodAvailabilityResponse.model_validate(service.availability(food_id))

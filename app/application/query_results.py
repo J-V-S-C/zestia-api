@@ -27,3 +27,9 @@ class OrganizationMetrics:
     registered_food_kg: Decimal
     donation_requests: RequestMetrics
     recipient_requests: RequestMetrics
+
+
+@dataclass(frozen=True)
+class FoodAvailability:
+    available_kg: Decimal
+    has_requests: bool

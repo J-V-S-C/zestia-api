@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from app.application.entities import Food, VerificationStatus
 from app.application.errors import BusinessError, Forbidden, InvalidInput
 from app.application.ports.repositories import FoodRepository, OrganizationRepository
+from app.application.query_results import FoodAvailability
 
 
 class FoodService:
@@ -38,6 +39,13 @@ class FoodService:
 
     def get(self, food_id: UUID) -> Food:
         return self.repository.get_food(food_id)
+
+    def availability(self, food_id: UUID) -> FoodAvailability:
+        food = self.repository.get_food(food_id, lock=True)
+        return FoodAvailability(
+            food.quantity_kg - self.repository.approved_food_quantity(food_id),
+            self.repository.food_has_requests(food_id),
+        )
 
     def list(
         self, offset: int, limit: int, donor_organization_id: UUID | None = None

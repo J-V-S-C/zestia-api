@@ -26,3 +26,11 @@ This records local results only. It does not assert remote CI/GitGuardian cleara
 Public configuration templates now include every Settings/AdminBootstrapSettings/RecoverySettings/SmtpSettings field. Completed private configuration paths are ignored. The public `.env.example` is included in source/staged scanning; a generated-secret regression proves rejection and redaction while private environment files remain unopened. A local isolated container verified literal dollar/hash characters survive production configuration injection unchanged. Final shared gate: 390 passed, none skipped, 99% application coverage; HTML coverage was regenerated. No VPS access, real credentials or live email were used for these checks.
 
 The authenticated `GET /api/v1/auth/me/organization` resolves the active organization from stored ownership. Ten PostgreSQL HTTP cases cover missing ownership, attempts to select another owner, every review state, archival/replacement, and missing/malformed/revoked/closed-account sessions. No schema migration was needed. The full gate passed with 390 tests and no skips, with 99% application coverage.
+
+Frontend availability contract — 19/11/2026: added an authenticated aggregate read
+for remaining kg and request existence, preserving private participant history and
+existing food response schemas. New PostgreSQL regression covers authentication,
+missing food, pending/rejected versus approved quantities, and an unrelated observer.
+Full gate passed: **391 tests, zero skips, 99% coverage**, including secret scanning,
+Ruff, dependency audit and migration downgrade/upgrade. Disposable database and explicit
+`--env-file /dev/null`; no private configuration or production database accessed.
